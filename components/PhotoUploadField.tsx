@@ -9,6 +9,43 @@ interface PhotoUploadFieldProps {
   disabled?: boolean;
 }
 
+function compressImage(dataUrl: string, maxWidth = 800, maxHeight = 1000, quality = 0.85): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+
+      if (width > maxWidth || height > maxHeight) {
+        const ratio = Math.min(maxWidth / width, maxHeight / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(dataUrl);
+        return;
+      }
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+      resolve(compressedDataUrl);
+    };
+    img.onerror = () => {
+      resolve(dataUrl);
+    };
+    img.src = dataUrl;
+  });
+}
+
 export default function PhotoUploadField({
   value,
   onChange,
@@ -16,6 +53,7 @@ export default function PhotoUploadField({
 }: PhotoUploadFieldProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [processing, setProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleFileProcess = (file: File) => {
@@ -25,17 +63,27 @@ export default function PhotoUploadField({
       return;
     }
 
-    if (file.size > 8 * 1024 * 1024) {
-      setError('画像サイズは8MB以下にしてください / ছবির সাইজ ৮ মেগাবাইটের বেশি হতে পারবে না।');
+    if (file.size > 15 * 1024 * 1024) {
+      setError('画像サイズは15MB以下にしてください / ছবির সাইজ ১৫ মেগাবাইটের বেশি হতে পারবে না।');
       return;
     }
 
+    setProcessing(true);
     const reader = new FileReader();
-    reader.onload = (e) => {
-      const base64 = e.target?.result as string;
-      onChange(base64);
+    reader.onload = async (e) => {
+      try {
+        const rawBase64 = e.target?.result as string;
+        const compressedBase64 = await compressImage(rawBase64);
+        onChange(compressedBase64);
+      } catch (err) {
+        console.error('Image compression error:', err);
+        setError('ছবির সাইজ অপ্টিমাইজ করতে ব্যর্থ হয়েছে।');
+      } finally {
+        setProcessing(false);
+      }
     };
     reader.onerror = () => {
+      setProcessing(false);
       setError('ファイルの読み込みに失敗しました / ফাইলটি পড়তে ব্যর্থ হয়েছে।');
     };
     reader.readAsDataURL(file);
@@ -208,7 +256,40 @@ export default function PhotoUploadField({
       />
 
       {/* Upload Zone / Live Preview */}
-      {!value ? (
+      {processing ? (
+        <div
+          className="photo-dropzone-box"
+          style={{
+            border: '2px dashed var(--nikkou-red)',
+            backgroundColor: '#fef2f2',
+            borderRadius: '12px',
+            padding: '36px 20px',
+            textAlign: 'center',
+          }}
+        >
+          <div
+            style={{
+              width: '54px',
+              height: '54px',
+              borderRadius: '50%',
+              backgroundColor: '#fee2e2',
+              color: 'var(--nikkou-red)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 12px auto',
+            }}
+          >
+            <RefreshCw size={26} className="animate-spin" />
+          </div>
+          <div style={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--nikkou-navy)', marginBottom: '4px' }}>
+            写真を最適化中... / ছবি অপ্টিমাইজ করা হচ্ছে...
+          </div>
+          <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+            Processing & compressing image for fast upload...
+          </div>
+        </div>
+      ) : !value ? (
         <div
           className="photo-dropzone-box"
           onDragOver={handleDragOver}

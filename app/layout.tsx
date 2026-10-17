@@ -7,9 +7,38 @@ export const viewport: Viewport = {
   maximumScale: 5,
 };
 
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nikkoucentre.com';
+
 export const metadata: Metadata = {
-  title: 'Nikkou Centre - Admin Portal',
-  description: 'Official Japanese Language School & Education Consultancy Management Platform',
+  metadataBase: new URL(appUrl),
+  title: {
+    default: 'Nikkou Centre - Japanese Language School & Education Consultancy',
+    template: '%s | Nikkou Centre',
+  },
+  description: 'Official Japanese Language School & Education Consultancy Management Platform and Student CV Maker.',
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    url: '/',
+    siteName: 'Nikkou Centre',
+    title: 'Nikkou Centre - Japanese Language School & Education Consultancy',
+    description: 'Official Japanese Language School & Education Consultancy Management Platform and Student CV Maker.',
+    images: [
+      {
+        url: '/images/og-image.jpg',
+        width: 1200,
+        height: 630,
+        alt: 'Nikkou Centre Japanese Language School & Consultancy',
+        type: 'image/jpeg',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Nikkou Centre - Japanese Language School & Education Consultancy',
+    description: 'Official Japanese Language School & Education Consultancy Management Platform and Student CV Maker.',
+    images: ['/images/og-image.jpg'],
+  },
   icons: {
     icon: '/favicon.svg',
     shortcut: '/favicon.svg',

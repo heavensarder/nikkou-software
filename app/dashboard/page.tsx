@@ -1,4 +1,5 @@
 import React from 'react';
+import type { Metadata } from 'next';
 import {
   Database,
   Server,
@@ -8,6 +9,33 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import styles from './dashboard.module.css';
+
+export const metadata: Metadata = {
+  title: 'Admin Dashboard Overview | Nikkou Centre',
+  description: 'Official Nikkou Centre administration dashboard overview, real-time database connectivity, student enrollment tracking, and system health status.',
+  openGraph: {
+    title: 'Admin Dashboard Overview | Nikkou Centre',
+    description: 'Official Nikkou Centre administration dashboard overview, real-time database connectivity, student enrollment tracking, and system health status.',
+    url: '/dashboard',
+    siteName: 'Nikkou Centre',
+    images: [
+      {
+        url: '/images/og-image.jpg',
+        width: 1200,
+        height: 630,
+        alt: 'Nikkou Centre Administrative Dashboard',
+        type: 'image/jpeg',
+      },
+    ],
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Admin Dashboard Overview | Nikkou Centre',
+    description: 'Official Nikkou Centre administration dashboard overview, real-time database connectivity, student enrollment tracking, and system health status.',
+    images: ['/images/og-image.jpg'],
+  },
+};
 
 export default function DashboardPage() {
   return (
