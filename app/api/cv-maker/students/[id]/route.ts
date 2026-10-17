@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { COOKIE_NAME, verifySessionToken } from '@/lib/auth';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { sanitizeDbDate, mapGenderToDbEnum, formatJapaneseBirthDate } from '@/lib/cv-normalizer';
 
 export async function GET(
   request: NextRequest,
@@ -49,33 +50,8 @@ export async function GET(
       }
     }
 
-    // Normalize date_of_birth to literal 'YYYY-MM-DD' string to prevent any JSON UTC conversion
-    if (student.date_of_birth) {
-      if (student.date_of_birth instanceof Date) {
-        const d = student.date_of_birth;
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        student.date_of_birth = `${y}-${m}-${day}`;
-      } else {
-        const s = String(student.date_of_birth).trim();
-        if (s.includes('T')) {
-          const d = new Date(s);
-          if (!isNaN(d.getTime())) {
-            const y = d.getFullYear();
-            const m = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            student.date_of_birth = `${y}-${m}-${day}`;
-          }
-        }
-      }
-    }
-    if (!student.date_of_birth && student.details_json?.dob_japanese) {
-      const jpMatch = String(student.details_json.dob_japanese).match(/^(\d{4})年\s*(\d{1,2})月\s*(\d{1,2})日?/);
-      if (jpMatch) {
-        student.date_of_birth = `${jpMatch[1]}-${jpMatch[2].padStart(2, '0')}-${jpMatch[3].padStart(2, '0')}`;
-      }
-    }
+    // Normalize date_of_birth to literal 'YYYY-MM-DD' string or null (never placeholder like '—')
+    student.date_of_birth = sanitizeDbDate(student.date_of_birth) || sanitizeDbDate(student.details_json?.dob_japanese) || null;
 
     return NextResponse.json({ success: true, student });
   } catch (error: any) {
@@ -116,11 +92,23 @@ export async function PUT(
     const finalProgram = body.program || body.selectedProgram || details?.program || null;
     const finalSubProgram = body.sub_program || body.subProgram || details?.sub_program || details?.subProgram || null;
 
+    // Sanitize date_of_birth and gender safely to prevent MySQL DATE / ENUM truncation errors
+    const finalDob = sanitizeDbDate(date_of_birth || details?.dob || details?.dob_japanese);
+    const finalGender = mapGenderToDbEnum(gender);
+
     const mergedDetails = {
       ...(details || {}),
       program: finalProgram,
       sub_program: finalSubProgram,
     };
+
+    if (finalDob) {
+      mergedDetails.dob = finalDob;
+      mergedDetails.dob_japanese = formatJapaneseBirthDate(finalDob);
+    } else {
+      mergedDetails.dob = null;
+      mergedDetails.dob_japanese = '—';
+    }
 
     if (mergedDetails.language_bengali) {
       if (mergedDetails.language_bengali.includes('出来る')) mergedDetails.language_bengali = '可 / পারি';
@@ -151,8 +139,8 @@ export async function PUT(
         finalFullName,
         email?.trim() || null,
         finalPhone,
-        gender || null,
-        date_of_birth || null,
+        finalGender,
+        finalDob,
         passport_number?.trim() || null,
         jlpt_level || 'None',
         Number(japanese_study_hours) || 0,

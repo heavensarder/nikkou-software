@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { sanitizeDbDate, mapGenderToDbEnum, formatJapaneseBirthDate } from '@/lib/cv-normalizer';
 
 export async function GET(
   request: NextRequest,
@@ -73,33 +74,8 @@ export async function GET(
       }
     }
 
-    // Normalize date_of_birth to literal 'YYYY-MM-DD'
-    if (student.date_of_birth) {
-      if (student.date_of_birth instanceof Date) {
-        const d = student.date_of_birth;
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        student.date_of_birth = `${y}-${m}-${day}`;
-      } else {
-        const s = String(student.date_of_birth).trim();
-        if (s.includes('T')) {
-          const d = new Date(s);
-          if (!isNaN(d.getTime())) {
-            const y = d.getFullYear();
-            const m = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            student.date_of_birth = `${y}-${m}-${day}`;
-          }
-        }
-      }
-    }
-    if (!student.date_of_birth && student.details_json?.dob_japanese) {
-      const jpMatch = String(student.details_json.dob_japanese).match(/^(\d{4})年\s*(\d{1,2})月\s*(\d{1,2})日?/);
-      if (jpMatch) {
-        student.date_of_birth = `${jpMatch[1]}-${jpMatch[2].padStart(2, '0')}-${jpMatch[3].padStart(2, '0')}`;
-      }
-    }
+    // Normalize date_of_birth to literal 'YYYY-MM-DD' or null (never placeholder like '—')
+    student.date_of_birth = sanitizeDbDate(student.date_of_birth) || sanitizeDbDate(student.details_json?.dob_japanese) || null;
 
     return NextResponse.json({ success: true, student });
   } catch (error: any) {
@@ -182,6 +158,18 @@ export async function PUT(
       if (mergedDetails.language_english.includes('少し出来る')) mergedDetails.language_english = '少し可 / কিছুটা পারি';
     }
 
+    // Sanitize date_of_birth and gender safely to prevent MySQL DATE / ENUM truncation errors
+    const finalDob = sanitizeDbDate(date_of_birth || mergedDetails?.dob || mergedDetails?.dob_japanese);
+    const finalGender = mapGenderToDbEnum(gender);
+
+    if (finalDob) {
+      mergedDetails.dob = finalDob;
+      mergedDetails.dob_japanese = formatJapaneseBirthDate(finalDob);
+    } else {
+      mergedDetails.dob = null;
+      mergedDetails.dob_japanese = '—';
+    }
+
     await query<ResultSetHeader>(
       `UPDATE student_cvs SET
         full_name = ?,
@@ -202,8 +190,8 @@ export async function PUT(
         finalFullName,
         email?.trim() || null,
         finalPhone,
-        gender || null,
-        date_of_birth || null,
+        finalGender,
+        finalDob,
         passport_number?.trim() || null,
         jlpt_level || 'None',
         Number(japanese_study_hours) || 0,

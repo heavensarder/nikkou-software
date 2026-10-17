@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { sanitizeDbDate, mapGenderToDbEnum, formatJapaneseBirthDate } from '@/lib/cv-normalizer';
 
 function generateStudentCode(id: number): string {
   const year = new Date().getFullYear();
@@ -103,11 +104,23 @@ export async function POST(
     const finalProgram = body.program || body.selectedProgram || details?.program || null;
     const finalSubProgram = body.sub_program || body.subProgram || details?.sub_program || details?.subProgram || null;
 
+    // Sanitize date_of_birth and gender safely to prevent MySQL DATE / ENUM truncation errors
+    const finalDob = sanitizeDbDate(date_of_birth || details?.dob || details?.dob_japanese);
+    const finalGender = mapGenderToDbEnum(gender);
+
     const mergedDetails = {
       ...(details || {}),
       program: finalProgram,
       sub_program: finalSubProgram,
     };
+
+    if (finalDob) {
+      mergedDetails.dob = finalDob;
+      mergedDetails.dob_japanese = formatJapaneseBirthDate(finalDob);
+    } else {
+      mergedDetails.dob = null;
+      mergedDetails.dob_japanese = '—';
+    }
 
     const tempCode = `TMP-${Date.now()}`;
 
@@ -123,8 +136,8 @@ export async function POST(
         finalFullName,
         email?.trim() || null,
         finalPhone,
-        gender || null,
-        date_of_birth || null,
+        finalGender,
+        finalDob,
         passport_number?.trim() || null,
         jlpt_level || 'None',
         Number(japanese_study_hours) || 0,

@@ -19,7 +19,9 @@ function normalizeCandidateDob(val) {
   }
 
   const s = String(val).trim();
-  if (!s) return '';
+  if (!s || s === '—' || s === '-' || s === '–' || s === 'null' || s === 'undefined' || s === 'None' || s === 'NaN-NaN-NaN') {
+    return '';
+  }
 
   const jpMatch = s.match(/^(\d{4})年\s*(\d{1,2})月\s*(\d{1,2})日?/);
   if (jpMatch) {
@@ -65,7 +67,7 @@ function normalizeCandidateDob(val) {
     return `${year}-${month}-${day}`;
   }
 
-  return s;
+  return '';
 }
 
 function calculateAgeFromDob(dob) {

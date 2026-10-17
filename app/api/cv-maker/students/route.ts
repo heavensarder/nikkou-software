@@ -3,6 +3,7 @@ import { query } from '@/lib/db';
 import { COOKIE_NAME, verifySessionToken } from '@/lib/auth';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import crypto from 'crypto';
+import { sanitizeDbDate, mapGenderToDbEnum, formatJapaneseBirthDate } from '@/lib/cv-normalizer';
 
 function generateStudentCode(id: number): string {
   const year = new Date().getFullYear();
@@ -110,28 +111,7 @@ export async function GET(request: NextRequest) {
           details.language_english = '可 / পারি';
         }
       }
-      let dobStr = s.date_of_birth;
-      if (dobStr instanceof Date) {
-        const d = dobStr;
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        dobStr = `${y}-${m}-${day}`;
-      } else if (dobStr && String(dobStr).includes('T')) {
-        const d = new Date(dobStr);
-        if (!isNaN(d.getTime())) {
-          const y = d.getFullYear();
-          const m = String(d.getMonth() + 1).padStart(2, '0');
-          const day = String(d.getDate()).padStart(2, '0');
-          dobStr = `${y}-${m}-${day}`;
-        }
-      }
-      if (!dobStr && details?.dob_japanese) {
-        const jpMatch = String(details.dob_japanese).match(/^(\d{4})年\s*(\d{1,2})月\s*(\d{1,2})日?/);
-        if (jpMatch) {
-          dobStr = `${jpMatch[1]}-${jpMatch[2].padStart(2, '0')}-${jpMatch[3].padStart(2, '0')}`;
-        }
-      }
+      const dobStr = sanitizeDbDate(s.date_of_birth) || sanitizeDbDate(details?.dob_japanese) || null;
 
       return {
         ...s,
@@ -178,11 +158,23 @@ export async function POST(request: NextRequest) {
     const finalProgram = body.program || body.selectedProgram || details?.program || null;
     const finalSubProgram = body.sub_program || body.subProgram || details?.sub_program || details?.subProgram || null;
 
+    // Sanitize date_of_birth and gender safely to prevent MySQL DATE / ENUM truncation errors
+    const finalDob = sanitizeDbDate(date_of_birth || details?.dob || details?.dob_japanese);
+    const finalGender = mapGenderToDbEnum(gender);
+
     const mergedDetails = {
       ...(details || {}),
       program: finalProgram,
       sub_program: finalSubProgram,
     };
+
+    if (finalDob) {
+      mergedDetails.dob = finalDob;
+      mergedDetails.dob_japanese = formatJapaneseBirthDate(finalDob);
+    } else {
+      mergedDetails.dob = null;
+      mergedDetails.dob_japanese = '—';
+    }
 
     if (mergedDetails.language_bengali) {
       if (mergedDetails.language_bengali.includes('出来る')) mergedDetails.language_bengali = '可 / পারি';
@@ -228,8 +220,8 @@ export async function POST(request: NextRequest) {
             finalFullName,
             email?.trim() || null,
             finalPhone,
-            gender || null,
-            date_of_birth || null,
+            finalGender,
+            finalDob,
             passport_number?.trim() || null,
             jlpt_level || 'None',
             Number(japanese_study_hours) || 0,
@@ -271,8 +263,8 @@ export async function POST(request: NextRequest) {
         finalFullName,
         email?.trim() || null,
         finalPhone,
-        gender || null,
-        date_of_birth || null,
+        finalGender,
+        finalDob,
         passport_number?.trim() || null,
         jlpt_level || 'None',
         Number(japanese_study_hours) || 0,

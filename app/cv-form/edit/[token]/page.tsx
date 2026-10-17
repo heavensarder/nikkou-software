@@ -266,20 +266,15 @@ function StudentCvEditFormContent() {
     e.preventDefault();
     setSubmitError('');
 
-    if (!fullName.trim() && !furigana.trim()) {
-      setSubmitError('Please enter your full name / অনুগ্রহ করে আপনার নাম লিখুন।');
-      return;
-    }
-
     setSubmitting(true);
 
     try {
       const payload = {
-        full_name: (fullName.trim() || furigana.trim()).toUpperCase(),
+        full_name: (fullName.trim() || furigana.trim() || lockedData?.full_name || 'UNTITLED APPLICANT').toUpperCase(),
         program: program || undefined,
         sub_program: subProgram || undefined,
         gender: gender.includes('女性') || gender === 'female' ? 'female' : 'male',
-        date_of_birth: dob || null,
+        date_of_birth: normalizeCandidateDob(dob) || null,
         phone: phone.trim() || '—',
         details: {
           program: program || null,
@@ -289,7 +284,7 @@ function StudentCvEditFormContent() {
           name_native: fullName.trim().toUpperCase(),
           gender_label: gender,
           marital_status: maritalStatus,
-          dob_japanese: formatJapaneseBirthDate(dob),
+          dob_japanese: formatJapaneseBirthDate(normalizeCandidateDob(dob)),
           age_display: normalizeCandidateAge(age, dob),
           address: address.trim(),
           phone: phone.trim(),

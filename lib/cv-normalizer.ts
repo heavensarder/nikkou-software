@@ -508,60 +508,109 @@ export function normalizeCandidateDob(val: any): string {
   }
 
   const s = String(val).trim();
-  if (!s) return '';
+  if (!s || s === '—' || s === '-' || s === '–' || s === 'null' || s === 'undefined' || s === 'None' || s === 'NaN-NaN-NaN') {
+    return '';
+  }
 
   // 1. If Japanese format: "2003年 12月 31日" or "2003年12月31日"
   const jpMatch = s.match(/^(\d{4})年\s*(\d{1,2})月\s*(\d{1,2})日?/);
   if (jpMatch) {
-    const year = jpMatch[1];
-    const month = jpMatch[2].padStart(2, '0');
-    const day = jpMatch[3].padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    const year = parseInt(jpMatch[1], 10);
+    const month = parseInt(jpMatch[2], 10);
+    const day = parseInt(jpMatch[3], 10);
+    if (year >= 1900 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+    return '';
   }
 
   // 2. If ISO timestamp with time component (e.g. "2003-12-30T18:00:00.000Z"):
-  // MUST parse as local Date FIRST before substring matching to avoid slicing UTC date!
   if (s.includes('T')) {
     const parsed = new Date(s);
     if (!isNaN(parsed.getTime())) {
       const year = parsed.getFullYear();
-      const month = String(parsed.getMonth() + 1).padStart(2, '0');
-      const day = String(parsed.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
+      const month = parsed.getMonth() + 1;
+      const day = parsed.getDate();
+      if (year >= 1900 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      }
     }
+    return '';
   }
 
   // 3. Exact YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [yStr, mStr, dStr] = s.split('-');
+    const year = parseInt(yStr, 10);
+    const month = parseInt(mStr, 10);
+    const day = parseInt(dStr, 10);
+    if (year >= 1900 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return s;
+    }
+    return '';
+  }
 
   // 4. DD/MM/YYYY or DD-MM-YYYY (exact end anchored)
   const dmy = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
   if (dmy) {
-    const day = dmy[1].padStart(2, '0');
-    const month = dmy[2].padStart(2, '0');
-    const year = dmy[3];
-    return `${year}-${month}-${day}`;
+    const day = parseInt(dmy[1], 10);
+    const month = parseInt(dmy[2], 10);
+    const year = parseInt(dmy[3], 10);
+    if (year >= 1900 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+    return '';
   }
 
   // 5. YYYY/MM/DD or YYYY.MM.DD (exact end anchored)
   const ymd = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
   if (ymd) {
-    const year = ymd[1];
-    const month = ymd[2].padStart(2, '0');
-    const day = ymd[3].padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    const year = parseInt(ymd[1], 10);
+    const month = parseInt(ymd[2], 10);
+    const day = parseInt(ymd[3], 10);
+    if (year >= 1900 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+    return '';
   }
 
   // 6. Standard date parse fallback (e.g. "12 Oct 1998", "October 12, 1998")
   const parsed = new Date(s);
   if (!isNaN(parsed.getTime())) {
     const year = parsed.getFullYear();
-    const month = String(parsed.getMonth() + 1).padStart(2, '0');
-    const day = String(parsed.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    const month = parsed.getMonth() + 1;
+    const day = parsed.getDate();
+    if (year >= 1900 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
   }
 
-  return s;
+  return '';
+}
+
+/**
+ * Sanitizes any input date into a valid 'YYYY-MM-DD' string for MySQL DATE column,
+ * or returns null if empty, invalid, or placeholder ('—', '-', etc.).
+ */
+export function sanitizeDbDate(val: any): string | null {
+  if (!val) return null;
+  const normalized = normalizeCandidateDob(val);
+  if (!normalized || !/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    return null;
+  }
+  return normalized;
+}
+
+/**
+ * Safely maps any gender input string to the MySQL enum ('male' | 'female' | 'other' | null).
+ */
+export function mapGenderToDbEnum(g: any): 'male' | 'female' | 'other' | null {
+  if (!g) return null;
+  const s = String(g).toLowerCase().trim();
+  if (s.includes('female') || s.includes('女') || s.includes('মহিলা')) return 'female';
+  if (s.includes('male') || s.includes('男') || s.includes('পুরুষ')) return 'male';
+  if (s.includes('other') || s.includes('その他') || s.includes('অন্যান্য')) return 'other';
+  return null;
 }
 
 export function normalizeJapaneseYearMonth(val: any): string {
@@ -602,7 +651,7 @@ export function normalizeJapaneseYearMonth(val: any): string {
 export function formatJapaneseBirthDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '—';
   const str = String(dateStr).trim();
-  if (!str) return '—';
+  if (!str || str === '—' || str === '-' || str === '–' || str === 'null' || str === 'undefined' || str === 'None') return '—';
 
   // 1. If already Japanese format (e.g. 2002年 06月 10日 or 2002年06月10日)
   const jp = str.match(/^(\d{4})年\s*(\d{1,2})月\s*(\d{1,2})日?/);

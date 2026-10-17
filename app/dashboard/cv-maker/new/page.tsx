@@ -512,7 +512,7 @@ function CreateNewCvContent() {
           full_name: furigana.trim() || fullName.trim() || 'Untitled Draft',
           phone: phone.trim() || '—',
           gender: mappedGender,
-          date_of_birth: dob || null,
+          date_of_birth: normalizeCandidateDob(dob) || null,
           details: {
             program: program || null,
             sub_program: subProgram || null,
@@ -522,7 +522,7 @@ function CreateNewCvContent() {
             gender_label: gender,
             marital_status: maritalStatus,
             age_display: normalizeCandidateAge(age, dob),
-            dob_japanese: formatJapaneseBirthDate(dob),
+            dob_japanese: formatJapaneseBirthDate(normalizeCandidateDob(dob)),
             address: address.trim(),
             phone: phone.trim(),
             eyesight: eyesight.trim(),
@@ -807,7 +807,7 @@ function CreateNewCvContent() {
           full_name: furigana.trim() || fullName.trim() || 'Untitled Student',
           phone: phone.trim() || '—',
           gender: mappedGender,
-          date_of_birth: dob || null,
+          date_of_birth: normalizeCandidateDob(dob) || null,
           details: {
             program: program || null,
             sub_program: subProgram || null,
@@ -818,7 +818,7 @@ function CreateNewCvContent() {
             gender_label: gender,
             marital_status: maritalStatus,
             age_display: normalizeCandidateAge(age, dob),
-            dob_japanese: formatJapaneseBirthDate(dob),
+            dob_japanese: formatJapaneseBirthDate(normalizeCandidateDob(dob)),
             address: address.trim(),
             phone: phone.trim(),
             // Section 2: 個人情報

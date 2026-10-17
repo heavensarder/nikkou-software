@@ -4,6 +4,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import ProgramCategorySection from '@/components/ProgramCategorySection';
+import { normalizeCandidateDob } from '@/lib/cv-normalizer';
 import styles from '../cv-form.module.css';
 import {
   User,
@@ -96,7 +97,7 @@ function PublicStudentCvFormContent() {
           program: program || undefined,
           sub_program: subProgram || undefined,
           gender,
-          date_of_birth: dob || null,
+          date_of_birth: normalizeCandidateDob(dob) || null,
           phone: phone.trim() || '—',
           email: email.trim() || null,
           passport_number: passport.trim() || null,
