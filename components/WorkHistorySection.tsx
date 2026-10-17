@@ -1,13 +1,14 @@
 'use client';
 
-import React from 'react';
-import { Plus, Trash2, Briefcase, Check } from 'lucide-react';
+import React, { useState } from 'react';
+import { Plus, Trash2, Briefcase, Check, Sparkles, RotateCcw, Loader2, CheckCircle2, AlertCircle, FileText } from 'lucide-react';
 import { WorkExperienceEntry } from '@/types/cv';
 
 interface WorkHistorySectionProps {
   entries: WorkExperienceEntry[];
   onChange: (entries: WorkExperienceEntry[]) => void;
   disabled?: boolean;
+  aiEnabled?: boolean;
 }
 
 // Convert YYYY-MM to Japanese format YYYY年MM月
@@ -30,6 +31,10 @@ export function parseJapaneseYearMonthToInput(val: string): string {
   if (match) {
     return `${match[1]}-${match[2].padStart(2, '0')}`;
   }
+  const ymMatch = val.match(/^(\d{4})[-/.](\d{1,2})/);
+  if (ymMatch) {
+    return `${ymMatch[1]}-${ymMatch[2].padStart(2, '0')}`;
+  }
   return '';
 }
 
@@ -47,7 +52,73 @@ export default function WorkHistorySection({
   entries,
   onChange,
   disabled = false,
+  aiEnabled = true,
 }: WorkHistorySectionProps) {
+  const [translatingIdx, setTranslatingIdx] = useState<number | null>(null);
+  const [translatedIdx, setTranslatedIdx] = useState<number | null>(null);
+  const [errorIdx, setErrorIdx] = useState<{ idx: number; msg: string } | null>(null);
+
+  const handleTranslateJobDesc = async (idx: number) => {
+    const text = entries[idx]?.job_description?.trim();
+    if (!text) {
+      setErrorIdx({ idx, msg: 'অনুবাদ করার জন্য কিছু টেক্সট লিখুন / Enter text to translate.' });
+      setTimeout(() => setErrorIdx(null), 3500);
+      return;
+    }
+
+    try {
+      setTranslatingIdx(idx);
+      setErrorIdx(null);
+
+      const currentOriginal = entries[idx]?.job_description_original_bn?.trim() || text;
+
+      const res = await fetch('/api/ai/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text,
+          fieldType: 'job_description',
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setErrorIdx({ idx, msg: data.message || 'Translation failed.' });
+        setTimeout(() => setErrorIdx(null), 4000);
+        return;
+      }
+
+      if (data.translatedText) {
+        const updated = [...entries];
+        updated[idx] = {
+          ...updated[idx],
+          job_description: data.translatedText,
+          job_description_original_bn: currentOriginal,
+        };
+        onChange(updated);
+        setTranslatedIdx(idx);
+        setTimeout(() => setTranslatedIdx(null), 3000);
+      }
+    } catch (err: any) {
+      setErrorIdx({ idx, msg: err?.message || 'Network error during translation.' });
+      setTimeout(() => setErrorIdx(null), 4000);
+    } finally {
+      setTranslatingIdx(null);
+    }
+  };
+
+  const handleResetJobDesc = (idx: number) => {
+    const orig = entries[idx]?.job_description_original_bn;
+    if (orig && orig.trim()) {
+      const updated = [...entries];
+      updated[idx] = {
+        ...updated[idx],
+        job_description: orig.trim(),
+      };
+      onChange(updated);
+    }
+  };
+
   const handleFieldChange = (index: number, field: keyof WorkExperienceEntry, value: string) => {
     const updated = [...entries];
     updated[index] = { ...updated[index], [field]: value };
@@ -467,7 +538,7 @@ export default function WorkHistorySection({
                   disabled={disabled}
                   onChange={(e) => handleFieldChange(idx, 'job_description', e.target.value)}
                   rows={4}
-                  placeholder="家族を支えるため、私は幼い頃から父と一緒に建設の仕事をしてきました。1年前に父が仕事を引退した後、私は父の仕事を引き継ぎました。現在は、建設に関するすべての仕事を自分で管理・運営しています / পরিবারকে সহযোগিতা করার জন্য ছোটবেলা থেকেই বাবার সঙ্গে নির্মাণের কাজ করে আসছি..."
+                  placeholder="পরিবারকে সহযোগিতা করার জন্য ছোটবেলা থেকেই বাবার সঙ্গে নির্মাণের কাজ করে আসছি..."
                   style={{
                     width: '100%',
                     padding: '10px 14px',
@@ -481,8 +552,103 @@ export default function WorkHistorySection({
                     resize: 'vertical',
                   }}
                 />
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '3px', display: 'block' }}>
-                  業務業務内容の詳細をご記入ください / দায়িত্ব ও কাজের বিস্তারিত বিবরণ লিখুন
+                
+                {/* Translate & Reset Action Buttons */}
+                {(aiEnabled || (entry.job_description_original_bn && entry.job_description_original_bn.trim())) && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
+                    {aiEnabled && (
+                      <button
+                        type="button"
+                        onClick={() => handleTranslateJobDesc(idx)}
+                        disabled={disabled || translatingIdx === idx || !entry.job_description?.trim()}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          padding: '4px 10px',
+                          fontSize: '11.5px',
+                          fontWeight: 700,
+                          color: '#1d4ed8',
+                          background: '#eff6ff',
+                          border: '1px solid #bfdbfe',
+                          borderRadius: '5px',
+                          cursor: disabled || translatingIdx === idx || !entry.job_description?.trim() ? 'not-allowed' : 'pointer',
+                          opacity: disabled || translatingIdx === idx || !entry.job_description?.trim() ? 0.6 : 1,
+                        }}
+                        title="Translate job duties into professional Japanese"
+                      >
+                        {translatingIdx === idx ? (
+                          <>
+                            <Loader2 size={12} className="spin" />
+                            <span>Translating... / অনুবাদ হচ্ছে...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles size={12} color="#1d4ed8" />
+                            <span>Translate Japanese / জাপানি অনুবাদ</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+
+                    {entry.job_description_original_bn && entry.job_description_original_bn.trim() && (
+                      <button
+                        type="button"
+                        onClick={() => handleResetJobDesc(idx)}
+                        disabled={disabled || translatingIdx === idx || !entry.job_description_original_bn?.trim()}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '4px 8px',
+                          fontSize: '11.5px',
+                          fontWeight: 600,
+                          color: '#dc2626',
+                          background: '#fef2f2',
+                          border: '1px solid #fecaca',
+                          borderRadius: '5px',
+                          cursor: disabled || translatingIdx === idx || !entry.job_description_original_bn?.trim() ? 'not-allowed' : 'pointer',
+                          opacity: disabled || translatingIdx === idx || !entry.job_description_original_bn?.trim() ? 0.5 : 1,
+                        }}
+                        title="Revert back to the original text"
+                      >
+                        <RotateCcw size={11} />
+                        <span>Reset / রিসেট</span>
+                      </button>
+                    )}
+
+                    {translatedIdx === idx && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '11px', fontWeight: 700, color: '#15803d', background: '#dcfce7', padding: '2px 6px', borderRadius: '4px' }}>
+                        <CheckCircle2 size={12} />
+                        <span>Translated!</span>
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Error notice */}
+                {errorIdx && errorIdx.idx === idx && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '4px', fontSize: '11.5px', color: '#b91c1c' }}>
+                    <AlertCircle size={13} />
+                    <span>{errorIdx.msg}</span>
+                  </div>
+                )}
+
+                {/* Original Bangla Display Box */}
+                {entry.job_description_original_bn && entry.job_description_original_bn.trim() !== entry.job_description?.trim() && (
+                  <div style={{ marginTop: '8px', padding: '8px 10px', background: '#f8fafc', border: '1px solid #e2e8f0', borderLeft: '3px solid #1f3864', borderRadius: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '2px' }}>
+                      <FileText size={12} color="#1f3864" />
+                      <span>Original Bangla Input (শিক্ষার্থীর মূল বাংলা লেখা):</span>
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#1e293b', lineHeight: 1.45, wordBreak: 'break-word' }}>
+                      {entry.job_description_original_bn}
+                    </div>
+                  </div>
+                )}
+
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                  業務内容の詳細をご記入ください / দায়িত্ব ও কাজের বিস্তারিত বিবরণ লিখুন
                 </span>
               </div>
             </div>

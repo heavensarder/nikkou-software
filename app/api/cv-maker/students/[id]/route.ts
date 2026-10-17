@@ -191,6 +191,10 @@ export async function PATCH(
     const { status } = body;
 
     if (status) {
+      const allowed = ['draft', 'submitted', 'verified', 'inactive'];
+      if (!allowed.includes(status)) {
+        return NextResponse.json({ success: false, message: 'Invalid status' }, { status: 400 });
+      }
       await query<ResultSetHeader>(
         'UPDATE student_cvs SET status = ? WHERE id = ?',
         [status, Number(id)]

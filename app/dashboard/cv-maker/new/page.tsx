@@ -21,8 +21,10 @@ import ProgramCategorySection from '@/components/ProgramCategorySection';
 import EducationHistorySection, { INITIAL_EDUCATION_ROWS } from '@/components/EducationHistorySection';
 import WorkHistorySection, { INITIAL_WORK_ROWS } from '@/components/WorkHistorySection';
 import FamilyInfoSection, { INITIAL_FAMILY_ROWS } from '@/components/FamilyInfoSection';
-import { EducationEntry, WorkExperienceEntry, FamilyMemberEntry } from '@/types/cv';
+import { EducationEntry, WorkExperienceEntry, FamilyMemberEntry, EYESIGHT_OPTIONS } from '@/types/cv';
 import AiDocumentFillModal from '@/components/AiDocumentFillModal';
+import EyesightField from '@/components/EyesightField';
+import TranslatableTextarea from '@/components/TranslatableTextarea';
 import {
   normalizeGender,
   normalizeMaritalStatus,
@@ -38,6 +40,7 @@ import {
   normalizeOccupation,
   normalizeFamilyAge,
   normalizeCandidateAge,
+  calculateAgeFromDob,
   normalizeCandidateDob,
   normalizeJapaneseYearMonth,
   formatJapaneseBirthDate,
@@ -87,7 +90,9 @@ function CreateNewCvContent() {
   const [smoking, setSmoking] = useState('');
   const [alcohol, setAlcohol] = useState('');
   const [hobbies, setHobbies] = useState('');
+  const [hobbiesOriginalBn, setHobbiesOriginalBn] = useState('');
   const [personality, setPersonality] = useState('');
+  const [personalityOriginalBn, setPersonalityOriginalBn] = useState('');
   const [cooking, setCooking] = useState('');
   const [groupLiving, setGroupLiving] = useState('');
   const [bloodType, setBloodType] = useState('');
@@ -95,7 +100,9 @@ function CreateNewCvContent() {
   const [personalIncome, setPersonalIncome] = useState('');
   const [targetSavings5Years, setTargetSavings5Years] = useState('');
   const [motivation, setMotivation] = useState('');
+  const [motivationOriginalBn, setMotivationOriginalBn] = useState('');
   const [futurePlanAfterJapan, setFuturePlanAfterJapan] = useState('');
+  const [futurePlanOriginalBn, setFuturePlanOriginalBn] = useState('');
   const [japanVisaAppliedBefore, setJapanVisaAppliedBefore] = useState('');
   const [japanVisaTypeApplied, setJapanVisaTypeApplied] = useState('');
 
@@ -317,7 +324,9 @@ function CreateNewCvContent() {
     setSmoking('');
     setAlcohol('');
     setHobbies('');
+    setHobbiesOriginalBn('');
     setPersonality('');
+    setPersonalityOriginalBn('');
     setCooking('');
     setGroupLiving('');
     setBloodType('');
@@ -325,7 +334,9 @@ function CreateNewCvContent() {
     setPersonalIncome('');
     setTargetSavings5Years('');
     setMotivation('');
+    setMotivationOriginalBn('');
     setFuturePlanAfterJapan('');
+    setFuturePlanOriginalBn('');
     setJapanVisaAppliedBefore('');
     setJapanVisaTypeApplied('');
     setEducationHistory(INITIAL_EDUCATION_ROWS.map((r, i) => ({ ...r, id: `edu-new-${i}-${Date.now()}` })));
@@ -397,7 +408,11 @@ function CreateNewCvContent() {
           if (data.smoking !== undefined) setSmoking(data.smoking);
           if (data.alcohol !== undefined) setAlcohol(data.alcohol);
           if (data.hobbies !== undefined) setHobbies(data.hobbies);
+          if (data.hobbiesOriginalBn !== undefined) setHobbiesOriginalBn(data.hobbiesOriginalBn);
+          if (data.hobbies_original_bn !== undefined) setHobbiesOriginalBn(data.hobbies_original_bn);
           if (data.personality !== undefined) setPersonality(data.personality);
+          if (data.personalityOriginalBn !== undefined) setPersonalityOriginalBn(data.personalityOriginalBn);
+          if (data.personality_original_bn !== undefined) setPersonalityOriginalBn(data.personality_original_bn);
           if (data.cooking !== undefined) setCooking(data.cooking);
           if (data.groupLiving !== undefined) setGroupLiving(data.groupLiving);
           if (data.bloodType !== undefined) setBloodType(data.bloodType);
@@ -405,7 +420,11 @@ function CreateNewCvContent() {
           if (data.personalIncome !== undefined) setPersonalIncome(data.personalIncome);
           if (data.targetSavings5Years !== undefined) setTargetSavings5Years(data.targetSavings5Years);
           if (data.motivation !== undefined) setMotivation(data.motivation);
+          if (data.motivationOriginalBn !== undefined) setMotivationOriginalBn(data.motivationOriginalBn);
+          if (data.motivation_original_bn !== undefined) setMotivationOriginalBn(data.motivation_original_bn);
           if (data.futurePlanAfterJapan !== undefined) setFuturePlanAfterJapan(data.futurePlanAfterJapan);
+          if (data.futurePlanOriginalBn !== undefined) setFuturePlanOriginalBn(data.futurePlanOriginalBn);
+          if (data.future_plan_original_bn !== undefined) setFuturePlanOriginalBn(data.future_plan_original_bn);
           if (data.japanVisaAppliedBefore !== undefined) setJapanVisaAppliedBefore(data.japanVisaAppliedBefore);
           if (data.japanVisaTypeApplied !== undefined) setJapanVisaTypeApplied(data.japanVisaTypeApplied);
 
@@ -502,7 +521,7 @@ function CreateNewCvContent() {
             name_native: fullName.trim(),
             gender_label: gender,
             marital_status: maritalStatus,
-            age_display: age.trim(),
+            age_display: normalizeCandidateAge(age, dob),
             dob_japanese: formatJapaneseBirthDate(dob),
             address: address.trim(),
             phone: phone.trim(),
@@ -515,7 +534,9 @@ function CreateNewCvContent() {
             smoking: smoking,
             alcohol: alcohol,
             hobbies: hobbies.trim(),
+            hobbies_original_bn: hobbiesOriginalBn.trim(),
             personality: personality.trim(),
+            personality_original_bn: personalityOriginalBn.trim(),
             cooking: cooking,
             group_living: groupLiving,
             blood_type: bloodType,
@@ -523,7 +544,9 @@ function CreateNewCvContent() {
             personal_income: personalIncome.trim(),
             target_savings_5years: targetSavings5Years.trim(),
             motivation: motivation.trim(),
+            motivation_original_bn: motivationOriginalBn.trim(),
             future_plan_after_japan: futurePlanAfterJapan.trim(),
+            future_plan_original_bn: futurePlanOriginalBn.trim(),
             japan_visa_applied_before: japanVisaAppliedBefore,
             japan_visa_type_applied: japanVisaTypeApplied.trim(),
             education_history: educationHistory.filter(
@@ -579,7 +602,9 @@ function CreateNewCvContent() {
           smoking,
           alcohol,
           hobbies,
+          hobbiesOriginalBn,
           personality,
+          personalityOriginalBn,
           cooking,
           groupLiving,
           bloodType,
@@ -587,7 +612,9 @@ function CreateNewCvContent() {
           personalIncome,
           targetSavings5Years,
           motivation,
+          motivationOriginalBn,
           futurePlanAfterJapan,
+          futurePlanOriginalBn,
           japanVisaAppliedBefore,
           japanVisaTypeApplied,
           educationHistory,
@@ -630,14 +657,8 @@ function CreateNewCvContent() {
     setDob(selectedDate);
 
     if (selectedDate) {
-      const birthDate = new Date(selectedDate);
-      const today = new Date();
-      let calculatedAge = today.getFullYear() - birthDate.getFullYear();
-      const monthDiff = today.getMonth() - birthDate.getMonth();
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-        calculatedAge--;
-      }
-      if (calculatedAge >= 0) {
+      const calculatedAge = calculateAgeFromDob(selectedDate);
+      if (calculatedAge !== null) {
         setAge(`${calculatedAge}歳 / ${calculatedAge} বছর`);
       }
     } else {
@@ -666,11 +687,11 @@ function CreateNewCvContent() {
     setGender('男性 / পুরুষ');
     setMaritalStatus('独身 / অবিবাহিত');
     setDob('2001-08-15');
-    setAge('25歳 / ২৫ বছর');
+    setAge('25歳 / 25 বছর');
     setAddress('VILL: PAIKPARA, P.O: JEWPARA, P.S: NATORE SADAR, NATORE');
     setPhone('+8801712-345678');
 
-    setEyesight('右1.2 - 左1.2');
+    setEyesight('右: 1.0 左: 1.0');
     setColorBlindness('無 / না');
     setDominantHand('右手 / ডান হাত');
     setBodyWeight('62kg');
@@ -679,15 +700,19 @@ function CreateNewCvContent() {
     setSmoking('無 / না');
     setAlcohol('無 / না');
     setBloodType('B+型 / বি+ গ্রুপ');
-    setHobbies('サッカーをすること、日本語の勉強 / ফুটবল খেলা এবং জাপানি ভাষা অধ্যয়ন');
-    setPersonality('真面目で責任感があり、協調性があります / দায়িত্বশীল, পরিশ্রমী এবং দলগত কাজে মনোযোগী');
+    setHobbies('サッカーをすること、日本語の勉強');
+    setHobbiesOriginalBn('ফুটবল খেলা এবং জাপানি ভাষা অধ্যয়ন');
+    setPersonality('真面目で責任感があり、協調性があります');
+    setPersonalityOriginalBn('দায়িত্বশীল, পরিশ্রমী এবং দলগত কাজে মনোযোগী');
     setCooking('有 / হ্যাঁ');
     setGroupLiving('有 / হ্যাঁ');
     setMedicalHistory('無 / না');
     setPersonalIncome('2 万円 / ইয়েন');
     setTargetSavings5Years('350万円 / ৩৫লক্ষ ইয়েন');
-    setMotivation('日本の先進的な技術と高い労働倫理を学び、将来のキャリアを発展させたいと考えております。 / জাপানের উন্নত প্রযুক্তি ও কাজের নীতি শিখে নিজের ক্যারিয়ার উন্নত করতে চাই।');
-    setFuturePlanAfterJapan('日本で培った技術とマネジメント経験を活かし、バングラデシュで技術指導や独立起業を目指します。 / জাপানে অর্জিত কারিগরি দক্ষতা ও কাজের অভিজ্ঞতা দিয়ে দেশে এসে ব্যবসা ও নেতৃত্ব দিতে চাই।');
+    setMotivation('日本の先進的な技術と高い労働倫理を学び、将来のキャリアを発展させたいと考えております。');
+    setMotivationOriginalBn('জাপানের উন্নত প্রযুক্তি ও কাজের নীতি শিখে নিজের ক্যারিয়ার উন্নত করতে চাই।');
+    setFuturePlanAfterJapan('日本で培った技術とマネジメント経験を活かし、バングラデシュで技術指導や独立起業を目指します。');
+    setFuturePlanOriginalBn('জাপানে অর্জিত কারিগরি দক্ষতা ও কাজের অভিজ্ঞতা দিয়ে দেশে এসে ব্যবসা ও নেতৃত্ব দিতে চাই।');
     setJapanVisaAppliedBefore('無 / না');
     setJapanVisaTypeApplied('無 / না');
 
@@ -792,7 +817,7 @@ function CreateNewCvContent() {
             name_native: fullName.trim(),
             gender_label: gender,
             marital_status: maritalStatus,
-            age_display: age.trim(),
+            age_display: normalizeCandidateAge(age, dob),
             dob_japanese: formatJapaneseBirthDate(dob),
             address: address.trim(),
             phone: phone.trim(),
@@ -806,7 +831,9 @@ function CreateNewCvContent() {
             smoking: smoking,
             alcohol: alcohol,
             hobbies: hobbies.trim(),
+            hobbies_original_bn: hobbiesOriginalBn.trim(),
             personality: personality.trim(),
+            personality_original_bn: personalityOriginalBn.trim(),
             cooking: cooking,
             group_living: groupLiving,
             blood_type: bloodType,
@@ -814,7 +841,9 @@ function CreateNewCvContent() {
             personal_income: personalIncome.trim(),
             target_savings_5years: targetSavings5Years.trim(),
             motivation: motivation.trim(),
+            motivation_original_bn: motivationOriginalBn.trim(),
             future_plan_after_japan: futurePlanAfterJapan.trim(),
+            future_plan_original_bn: futurePlanOriginalBn.trim(),
             japan_visa_applied_before: japanVisaAppliedBefore,
             japan_visa_type_applied: japanVisaTypeApplied.trim(),
             // Section 3: 学歴 / শিক্ষাগত যোগ্যতা
@@ -1456,7 +1485,10 @@ function CreateNewCvContent() {
                   type="text"
                   value={age}
                   onChange={(e) => setAge(e.target.value)}
-                  placeholder="自動計算 (例: 24歳 / ২৪ বছর)"
+                  onBlur={() => {
+                    if (age || dob) setAge(normalizeCandidateAge(age, dob));
+                  }}
+                  placeholder="自動計算 (例: 19歳 / 19 বছর)"
                   style={{
                     width: '100%',
                     height: '44px',
@@ -1554,27 +1586,7 @@ function CreateNewCvContent() {
 
             {/* Grid 1: Eyesight, Color Blindness, Dominant Hand */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '18px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '13.5px', fontWeight: 700, color: 'var(--nikkou-navy)', marginBottom: '6px' }}>
-                  視力 / দৃষ্টিশক্তি
-                </label>
-                <input
-                  type="text"
-                  value={eyesight}
-                  onChange={(e) => setEyesight(e.target.value)}
-                  placeholder="例: 右1.1 - 左1.1"
-                  style={{
-                    width: '100%',
-                    height: '44px',
-                    padding: '0 14px',
-                    borderRadius: '8px',
-                    border: '1.5px solid var(--border-light)',
-                    fontSize: '14px',
-                    color: 'var(--text-primary)',
-                    outline: 'none',
-                  }}
-                />
-              </div>
+              <EyesightField value={eyesight} onChange={setEyesight} />
 
               <div>
                 <label style={{ display: 'block', fontSize: '13.5px', fontWeight: 700, color: 'var(--nikkou-navy)', marginBottom: '6px' }}>
@@ -1785,49 +1797,35 @@ function CreateNewCvContent() {
               </div>
             </div>
 
-            {/* Grid 4: Hobby & Personality */}
+            {/* Grid 4: Hobby & Personality (Translatable) */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '18px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '13.5px', fontWeight: 700, color: 'var(--nikkou-navy)', marginBottom: '6px' }}>
-                  趣味 / শখ:
-                </label>
-                <input
-                  type="text"
+                <TranslatableTextarea
+                  labelJp="趣味"
+                  labelBn="শখ"
                   value={hobbies}
-                  onChange={(e) => setHobbies(e.target.value)}
-                  placeholder="例: サッカーをするのが好きです / আমি ফুটবল খেলতে পছন্দ করি"
-                  style={{
-                    width: '100%',
-                    height: '44px',
-                    padding: '0 14px',
-                    borderRadius: '8px',
-                    border: '1.5px solid var(--border-light)',
-                    fontSize: '14px',
-                    color: 'var(--text-primary)',
-                    outline: 'none',
-                  }}
+                  onChange={setHobbies}
+                  originalBn={hobbiesOriginalBn}
+                  onChangeOriginalBn={setHobbiesOriginalBn}
+                  fieldType="hobbies"
+                  placeholder="আমি ফুটবল খেলতে পছন্দ করি"
+                  rows={2}
+                  aiEnabled={aiEnabled}
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13.5px', fontWeight: 700, color: 'var(--nikkou-navy)', marginBottom: '6px' }}>
-                  性格 / নিজের ব্যক্তিত্ব:
-                </label>
-                <input
-                  type="text"
+                <TranslatableTextarea
+                  labelJp="性格"
+                  labelBn="নিজের ব্যক্তিত্ব"
                   value={personality}
-                  onChange={(e) => setPersonality(e.target.value)}
-                  placeholder="例: 勤勉でフレンドリーな性格 / পরিশ্রমী এবং বন্ধুত্বপূর্ণ ব্যক্তিত্ব"
-                  style={{
-                    width: '100%',
-                    height: '44px',
-                    padding: '0 14px',
-                    borderRadius: '8px',
-                    border: '1.5px solid var(--border-light)',
-                    fontSize: '14px',
-                    color: 'var(--text-primary)',
-                    outline: 'none',
-                  }}
+                  onChange={setPersonality}
+                  originalBn={personalityOriginalBn}
+                  onChangeOriginalBn={setPersonalityOriginalBn}
+                  fieldType="personality"
+                  placeholder="পরিশ্রমী এবং বন্ধুত্বপূর্ণ ব্যক্তিত্ব"
+                  rows={2}
+                  aiEnabled={aiEnabled}
                 />
               </div>
             </div>
@@ -1957,53 +1955,33 @@ function CreateNewCvContent() {
               </div>
             </div>
 
-            {/* Motivation: Big Text Area */}
-            <div style={{ marginBottom: '18px' }}>
-              <label style={{ display: 'block', fontSize: '13.5px', fontWeight: 700, color: 'var(--nikkou-navy)', marginBottom: '6px' }}>
-                志望動機 / আবেদন করার অনুপ্রেরণা
-              </label>
-              <textarea
-                rows={3}
-                value={motivation}
-                onChange={(e) => setMotivation(e.target.value)}
-                placeholder="例: 日本の職場でチームワークの大切さを学びたいです。 / জাপানের কর্মক্ষেত্রে টিমওয়ার্কের গুরুত্ব শিখতে চাই।"
-                style={{
-                  width: '100%',
-                  padding: '12px 14px',
-                  borderRadius: '8px',
-                  border: '1.5px solid var(--border-light)',
-                  fontSize: '14px',
-                  color: 'var(--text-primary)',
-                  fontFamily: 'inherit',
-                  outline: 'none',
-                  resize: 'vertical',
-                }}
-              />
-            </div>
+            {/* Motivation: Translatable Text Area */}
+            <TranslatableTextarea
+              labelJp="志望動機"
+              labelBn="আবেদন করার অনুপ্রেরণা"
+              value={motivation}
+              onChange={setMotivation}
+              originalBn={motivationOriginalBn}
+              onChangeOriginalBn={setMotivationOriginalBn}
+              fieldType="motivation"
+              placeholder="জাপানের কর্মক্ষেত্রে টিমওয়ার্কের গুরুত্ব শিখতে চাই।"
+              rows={3}
+              aiEnabled={aiEnabled}
+            />
 
-            {/* Future Plan: Big Text Area */}
-            <div style={{ marginBottom: '18px' }}>
-              <label style={{ display: 'block', fontSize: '13.5px', fontWeight: 700, color: 'var(--nikkou-navy)', marginBottom: '6px' }}>
-                将来の目標 / ভবিষ্যতের লক্ষ্য
-              </label>
-              <textarea
-                rows={4}
-                value={futurePlanAfterJapan}
-                onChange={(e) => setFuturePlanAfterJapan(e.target.value)}
-                placeholder="例: 日本で建設の仕事をしっかり勉強して、技術と経験を身につけたいです。そして、将来、帰国して、自分の建設会社を作りたいです。 / আমি জাপানে কনস্ট্রাকশনের কাজ ভালোভাবে শিখে প্রযুক্তিগত দক্ষতা ও অভিজ্ঞতা অর্জন করতে চাই। এরপর ভবিষ্যতে দেশে ফিরে নিজের একটি কনস্ট্রাকশন কোম্পানি করতে চাই।"
-                style={{
-                  width: '100%',
-                  padding: '12px 14px',
-                  borderRadius: '8px',
-                  border: '1.5px solid var(--border-light)',
-                  fontSize: '14px',
-                  color: 'var(--text-primary)',
-                  fontFamily: 'inherit',
-                  outline: 'none',
-                  resize: 'vertical',
-                }}
-              />
-            </div>
+            {/* Future Plan: Translatable Text Area */}
+            <TranslatableTextarea
+              labelJp="将来の目標"
+              labelBn="ভবিষ্যতের লক্ষ্য"
+              value={futurePlanAfterJapan}
+              onChange={setFuturePlanAfterJapan}
+              originalBn={futurePlanOriginalBn}
+              onChangeOriginalBn={setFuturePlanOriginalBn}
+              fieldType="future_plan"
+              placeholder="আমি জাপানে কনস্ট্রাকশনের কাজ ভালোভাবে শিখে প্রযুক্তিগত দক্ষতা ও অভিজ্ঞতা অর্জন করতে চাই। এরপর ভবিষ্যতে দেশে ফিরে নিজের একটি কনস্ট্রাকশন কোম্পানি করতে চাই।"
+              rows={4}
+              aiEnabled={aiEnabled}
+            />
 
             {/* Grid 7: Visa History */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '18px' }}>
@@ -2224,6 +2202,7 @@ function CreateNewCvContent() {
             entries={workHistory}
             onChange={setWorkHistory}
             disabled={saving}
+            aiEnabled={aiEnabled}
           />
 
           {/* SECTION 6: 家族 / পরিবার */}
@@ -2279,7 +2258,7 @@ function CreateNewCvContent() {
                     margin: 0,
                   }}
                 >
-                  評価 / মূল্যায়ন
+                  評価 / মূল্যায়ন (For Teachers)
                 </h2>
               </div>
 

@@ -23,11 +23,22 @@ import {
   Check,
   Printer,
   Edit3,
+  Link2,
+  Lock,
 } from 'lucide-react';
 import { StudentCv } from '@/types/cv';
 import { PROGRAM_OPTIONS, getSubPrograms, formatProgramBadge } from '@/lib/programs';
 import styles from '../cv-maker.module.css';
-import { formatJapaneseBirthDate, formatLanguageDisplay } from '@/lib/cv-normalizer';
+import { formatJapaneseBirthDate, formatLanguageDisplay, normalizeCandidateAge } from '@/lib/cv-normalizer';
+import {
+  stripBengali,
+  formatPureJapaneseAge,
+  formatPureJapaneseSavings,
+  formatPureJapaneseIncome,
+  formatPureJapaneseLanguage,
+  formatCvFieldValue,
+  getExportPdfFileName,
+} from '@/lib/cv-pure-japanese';
 export { formatJapaneseBirthDate, formatLanguageDisplay };
 
 export function getJapaneseTodayDate(): { year: string; month: string; day: string } {
@@ -43,16 +54,17 @@ export function formatFamilyMemberAge(val: string | null | undefined): string {
   if (!val) return '—';
   const trimmed = String(val).trim();
   if (!trimmed) return '—';
-  if (trimmed.includes('歳') || trimmed.includes('বছর')) return trimmed;
-  const num = parseInt(trimmed, 10);
-  if (!isNaN(num) && num > 0 && num <= 120) {
-    const bnDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
-    const bn = num
-      .toString()
-      .split('')
-      .map((d) => bnDigits[parseInt(d, 10)] ?? d)
-      .join('');
-    return `${num}歳 / ${bn} বছর`;
+  const bnDigits: { [k: string]: string } = {
+    '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4',
+    '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9',
+  };
+  const normalized = trimmed.replace(/[০-৯]/g, (d) => bnDigits[d] || d);
+  const match = normalized.match(/(\d+)/);
+  if (match) {
+    const num = parseInt(match[1], 10);
+    if (!isNaN(num) && num > 0 && num <= 120) {
+      return `${num}歳 / ${num} বছর`;
+    }
   }
   return trimmed;
 }
@@ -65,17 +77,53 @@ export default function StudentListPage() {
   const [selectedProgram, setSelectedProgram] = useState('');
   const [selectedSubProgram, setSelectedSubProgram] = useState('');
   const [copied, setCopied] = useState(false);
+  const [copiedEditToken, setCopiedEditToken] = useState<string | null>(null);
 
   // Selected student for drawer preview
   const [activeStudent, setActiveStudent] = useState<StudentCv | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
+  // AI Settings Status (Controls whether AI translation and Pure Japanese CV mode are enabled)
+  const [aiEnabled, setAiEnabled] = useState(false);
+
+  // Print version mode selected by user: 'japanese' or 'student'
+  const [selectedPrintVersion, setSelectedPrintVersion] = useState<'japanese' | 'student'>('japanese');
+
+  useEffect(() => {
+    async function checkAiStatus() {
+      try {
+        const res = await fetch('/api/settings/ai');
+        if (res.ok) {
+          const data = await res.json();
+          const isEnabled = Boolean(data.enabled);
+          setAiEnabled(isEnabled);
+          if (!isEnabled) {
+            setSelectedPrintVersion('student');
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load AI settings status', err);
+      }
+    }
+    checkAiStatus();
+  }, []);
+
+  // When AI is off, Japanese version must be hidden and strictly revert to student bilingual version
+  const printVersion: 'japanese' | 'student' = aiEnabled ? selectedPrintVersion : 'student';
+  const effectivePrintVersion = printVersion;
+  const setPrintVersion = setSelectedPrintVersion;
+
   // Target element ref for clean, pixel-perfect A4 printing
   const cvPrintRef = useRef<HTMLDivElement>(null);
 
+  const exportPdfFileName = getExportPdfFileName(
+    activeStudent?.details_json?.name_native || activeStudent?.full_name,
+    effectivePrintVersion
+  );
+
   const handleReactToPrint = useReactToPrint({
     contentRef: cvPrintRef,
-    documentTitle: activeStudent ? `CV_${activeStudent.student_code || activeStudent.full_name}` : 'Rirekisho_CV',
+    documentTitle: exportPdfFileName,
     ignoreGlobalStyles: true,
     pageStyle: `
       @import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700;800;900&family=Noto+Sans+JP:wght@400;500;600;700;800;900&display=swap');
@@ -207,6 +255,16 @@ export default function StudentListPage() {
     const finalNumber = printKeepEmpty ? '' : (tempPrintNumber.trim() || '1');
     setPrintNumber(finalNumber);
     setIsAskingPrintNumber(false);
+
+    const fileName = getExportPdfFileName(
+      activeStudent?.details_json?.name_native || activeStudent?.full_name,
+      effectivePrintVersion
+    );
+    const prevTitle = typeof document !== 'undefined' ? document.title : '';
+    if (typeof document !== 'undefined') {
+      document.title = fileName;
+    }
+
     setTimeout(() => {
       try {
         if (typeof handleReactToPrint === 'function') {
@@ -217,6 +275,12 @@ export default function StudentListPage() {
       } catch (err) {
         console.error('Trigger print error:', err);
         window.print();
+      } finally {
+        setTimeout(() => {
+          if (typeof document !== 'undefined') {
+            document.title = prevTitle;
+          }
+        }, 1500);
       }
     }, 120);
   };
@@ -227,6 +291,15 @@ export default function StudentListPage() {
     navigator.clipboard.writeText(formUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
+  };
+
+  const handleCopyStudentEditLink = (editToken?: string | null) => {
+    if (!editToken) return;
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const editUrl = `${origin}/cv-form/edit/${editToken}`;
+    navigator.clipboard.writeText(editUrl);
+    setCopiedEditToken(editToken);
+    setTimeout(() => setCopiedEditToken(null), 2500);
   };
 
   const fetchStudents = async (
@@ -348,16 +421,27 @@ export default function StudentListPage() {
     switch (status) {
       case 'draft':
         return <span className={`${styles.badge} ${styles.badgeDraft}`}>Draft</span>;
-      case 'submitted':
-        return <span className={`${styles.badge} ${styles.badgeSubmitted}`}>Submitted</span>;
-      case 'under_review':
-        return <span className={`${styles.badge} ${styles.badgeUnderReview}`}>Under Review</span>;
       case 'verified':
-        return <span className={`${styles.badge} ${styles.badgeVerified}`}>Verified</span>;
-      case 'approved':
-        return <span className={`${styles.badge} ${styles.badgeApproved}`}>Approved</span>;
+        return (
+          <span
+            className={`${styles.badge} ${styles.badgeVerified}`}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              background: '#ecfdf5',
+              color: '#047857',
+              borderColor: '#a7f3d0',
+              fontWeight: 700,
+            }}
+          >
+            <Check size={12} />
+            Verified
+          </span>
+        );
+      case 'submitted':
       default:
-        return <span className={`${styles.badge} ${styles.badgeActive}`}>{status}</span>;
+        return <span className={`${styles.badge} ${styles.badgeSubmitted}`}>Submitted</span>;
     }
   };
 
@@ -493,9 +577,7 @@ export default function StudentListPage() {
               <option value="">All Statuses</option>
               <option value="draft">Draft</option>
               <option value="submitted">Submitted</option>
-              <option value="under_review">Under Review</option>
               <option value="verified">Verified</option>
-              <option value="approved">Approved</option>
             </select>
 
             {/* Reset Filters button if any filter is active */}
@@ -716,6 +798,61 @@ export default function StudentListPage() {
                       {/* Actions */}
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
+                          {/* Student Edit Link Button */}
+                          {student.status === 'verified' ? (
+                            <button
+                              type="button"
+                              disabled
+                              className={styles.secondaryBtn}
+                              title="Application is verified — edit link is locked"
+                              style={{
+                                padding: '6px 10px',
+                                opacity: 0.65,
+                                cursor: 'not-allowed',
+                                background: '#f8fafc',
+                                color: '#64748b',
+                                borderColor: '#e2e8f0',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '12px',
+                              }}
+                            >
+                              <Lock size={13} color="#94a3b8" />
+                              <span>Locked</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleCopyStudentEditLink(student.edit_token)}
+                              className={`${styles.secondaryBtn} ${copiedEditToken === student.edit_token ? styles.copyBtnSuccess : ''}`}
+                              title="Copy student form edit link"
+                              style={{
+                                padding: '6px 10px',
+                                color: copiedEditToken === student.edit_token ? '#059669' : '#0284c7',
+                                borderColor: copiedEditToken === student.edit_token ? '#a7f3d0' : '#bae6fd',
+                                background: copiedEditToken === student.edit_token ? '#ecfdf5' : '#f0f9ff',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '12px',
+                                fontWeight: 700,
+                              }}
+                            >
+                              {copiedEditToken === student.edit_token ? (
+                                <>
+                                  <Check size={13} />
+                                  <span>Copied!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Link2 size={13} />
+                                  <span>Edit Link</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+
                           <button
                             type="button"
                             onClick={() => handleOpenDrawer(student)}
@@ -821,6 +958,60 @@ export default function StudentListPage() {
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {/* Student Edit Link in Drawer */}
+                {activeStudent.status === 'verified' ? (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '8px 14px',
+                      borderRadius: '8px',
+                      border: '1.5px solid #a7f3d0',
+                      background: '#ecfdf5',
+                      color: '#047857',
+                      fontSize: '12.5px',
+                      fontWeight: 700,
+                    }}
+                    title="This application is verified and locked from editing."
+                  >
+                    <Lock size={14} />
+                    <span>Edit Link Locked</span>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleCopyStudentEditLink(activeStudent.edit_token)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '8px 14px',
+                      borderRadius: '8px',
+                      border: `1.5px solid ${copiedEditToken === activeStudent.edit_token ? '#a7f3d0' : '#bae6fd'}`,
+                      background: copiedEditToken === activeStudent.edit_token ? '#ecfdf5' : '#f0f9ff',
+                      color: copiedEditToken === activeStudent.edit_token ? '#059669' : '#0284c7',
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                    title="Copy shareable edit link for the student"
+                  >
+                    {copiedEditToken === activeStudent.edit_token ? (
+                      <>
+                        <Check size={16} />
+                        <span>Link Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Link2 size={16} />
+                        <span>Copy Student Edit Link</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
                 <Link
                   href={`/dashboard/cv-maker/students/${activeStudent.id}/edit`}
                   style={{
@@ -947,12 +1138,99 @@ export default function StudentListPage() {
                     }}
                   >
                     <option value="submitted">Submitted</option>
-                    <option value="under_review">Under Review</option>
                     <option value="verified">Verified</option>
-                    <option value="approved">Approved</option>
+                    <option value="draft">Draft</option>
                   </select>
                 </div>
               </div>
+
+              {/* Dual-Version Print Format Switcher Tab (Hidden during Print and Hidden when AI is off) */}
+              {aiEnabled && (
+                <div
+                  className={styles.noPrint}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 18px',
+                    background: 'linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%)',
+                    border: '1.5px solid #cbd5e1',
+                    borderRadius: '10px',
+                    marginTop: '12px',
+                    marginBottom: '16px',
+                    flexWrap: 'wrap',
+                    gap: '12px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '13.5px', fontWeight: 800, color: 'var(--nikkou-navy)' }}>
+                      印刷形式 / Print Version:
+                    </span>
+                    <span style={{ fontSize: '12px', color: '#64748b' }}>
+                      {effectivePrintVersion === 'japanese'
+                        ? '（100%日本語・ベンガル語表記完全排除 / Pure Japanese for Japanese Companies）'
+                        : '（日本語＋ベンガル語併記 / Bilingual Version for Student Reference）'}
+                    </span>
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      background: '#e2e8f0',
+                      padding: '3px',
+                      borderRadius: '8px',
+                      gap: '4px',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setPrintVersion('japanese')}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '7px 16px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        background: effectivePrintVersion === 'japanese' ? '#1f3864' : 'transparent',
+                        color: effectivePrintVersion === 'japanese' ? '#ffffff' : '#334155',
+                        fontSize: '13px',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        boxShadow: effectivePrintVersion === 'japanese' ? '0 2px 6px rgba(31, 56, 100, 0.25)' : 'none',
+                      }}
+                    >
+                      <span>🇯🇵</span>
+                      <span>日本語版 (Pure Japanese)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPrintVersion('student')}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '7px 16px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        background: effectivePrintVersion === 'student' ? '#1f3864' : 'transparent',
+                        color: effectivePrintVersion === 'student' ? '#ffffff' : '#334155',
+                        fontSize: '13px',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        boxShadow: effectivePrintVersion === 'student' ? '0 2px 6px rgba(31, 56, 100, 0.25)' : 'none',
+                      }}
+                    >
+                      <span>🇧🇩</span>
+                      <span>学生用 (Student Bilingual)</span>
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* PRINTABLE A4 CV DOCUMENT - REACT-TO-PRINT TARGET */}
               <div
@@ -965,7 +1243,9 @@ export default function StudentListPage() {
                   margin: '0 auto',
                   padding: '16px 18px',
                   boxSizing: 'border-box',
-                  fontFamily: 'var(--font-bilingual, "Noto Sans JP", "Noto Sans Bengali", "Hind Siliguri", sans-serif)',
+                  fontFamily: printVersion === 'japanese'
+                    ? '"Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif'
+                    : 'var(--font-bilingual, "Noto Sans JP", "Noto Sans Bengali", "Hind Siliguri", sans-serif)',
                   color: '#000000',
                   lineHeight: 1.35,
                   boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
@@ -1007,10 +1287,12 @@ export default function StudentListPage() {
                               color: '#1f3864',
                               letterSpacing: '2px',
                               lineHeight: 1.15,
-                              fontFamily: 'var(--font-bilingual, "Noto Sans JP", "Noto Sans Bengali", "Hind Siliguri", sans-serif)',
+                              fontFamily: printVersion === 'japanese'
+                                ? '"Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif'
+                                : 'var(--font-bilingual, "Noto Sans JP", "Noto Sans Bengali", "Hind Siliguri", sans-serif)',
                             }}
                           >
-                            履歴書 / জীবনবৃত্তান্ত
+                            {printVersion === 'japanese' ? '履歴書' : '履歴書 / জীবনবৃত্তান্ত'}
                           </div>
                           <div
                             style={{
@@ -1021,7 +1303,7 @@ export default function StudentListPage() {
                               letterSpacing: '0.2px',
                             }}
                           >
-                            作成日 / তৈরির তারিখ:&nbsp;&nbsp;&nbsp;&nbsp;
+                            {printVersion === 'japanese' ? '作成日:' : '作成日 / তৈরির তারিখ:'}&nbsp;&nbsp;&nbsp;&nbsp;
                             <span>{today.year}年</span>&nbsp;&nbsp;&nbsp;&nbsp;
                             <span>{today.month}月</span>&nbsp;&nbsp;&nbsp;&nbsp;
                             <span>{today.day}日</span>
@@ -1047,7 +1329,7 @@ export default function StudentListPage() {
                               letterSpacing: '0.2px',
                             }}
                           >
-                            番号/no
+                            {printVersion === 'japanese' ? '番号' : '番号/no'}
                           </div>
                           <div
                             onClick={handleInitiatePrint}
@@ -1090,7 +1372,7 @@ export default function StudentListPage() {
                         }}
                       >
                         <span style={{ width: '4px', height: '14px', background: '#c00000', borderRadius: '2px', display: 'inline-block', flexShrink: 0 }} />
-                        <span>基本情報 / প্রাথমিক তথ্য</span>
+                        <span>{printVersion === 'japanese' ? '基本情報' : '基本情報 / প্রাথমিক তথ্য'}</span>
                       </div>
 
                       {/* Basic Info Table & Photo Side-by-Side with matched height */}
@@ -1134,7 +1416,9 @@ export default function StudentListPage() {
                                   }}
                                 >
                                   <div>フリガナ</div>
-                                  <div style={{ fontSize: '9px', color: '#475569' }}>ফুরিগানা</div>
+                                  {printVersion === 'student' && (
+                                    <div style={{ fontSize: '9px', color: '#475569' }}>ফুরিগানা</div>
+                                  )}
                                 </td>
                                 <td
                                   style={{
@@ -1163,7 +1447,9 @@ export default function StudentListPage() {
                                   }}
                                 >
                                   <div>性別</div>
-                                  <div style={{ fontSize: '9px', color: '#475569' }}>সেক্স</div>
+                                  {printVersion === 'student' && (
+                                    <div style={{ fontSize: '9px', color: '#475569' }}>সেক্স</div>
+                                  )}
                                 </td>
                                 <td
                                   style={{
@@ -1174,7 +1460,9 @@ export default function StudentListPage() {
                                     fontSize: '11.5px',
                                   }}
                                 >
-                                  {activeStudent.details_json?.gender_label || (activeStudent.gender === 'female' ? '女性' : '男性')}
+                                  {printVersion === 'japanese'
+                                    ? stripBengali(activeStudent.details_json?.gender_label || (activeStudent.gender === 'female' ? '女性' : '男性'))
+                                    : (activeStudent.details_json?.gender_label || (activeStudent.gender === 'female' ? '女性' : '男性'))}
                                 </td>
                               </tr>
 
@@ -1192,7 +1480,9 @@ export default function StudentListPage() {
                                   }}
                                 >
                                   <div>氏名</div>
-                                  <div style={{ fontSize: '9px', color: '#475569' }}>নাম</div>
+                                  {printVersion === 'student' && (
+                                    <div style={{ fontSize: '9px', color: '#475569' }}>নাম</div>
+                                  )}
                                 </td>
                                 <td
                                   style={{
@@ -1220,7 +1510,9 @@ export default function StudentListPage() {
                                   }}
                                 >
                                   <div>婚姻</div>
-                                  <div style={{ fontSize: '9px', color: '#475569' }}>বিবাহ</div>
+                                  {printVersion === 'student' && (
+                                    <div style={{ fontSize: '9px', color: '#475569' }}>বিবাহ</div>
+                                  )}
                                 </td>
                                 <td
                                   style={{
@@ -1231,7 +1523,9 @@ export default function StudentListPage() {
                                     fontSize: '11.5px',
                                   }}
                                 >
-                                  {activeStudent.details_json?.marital_status || '独身'}
+                                  {printVersion === 'japanese'
+                                    ? stripBengali(activeStudent.details_json?.marital_status || '独身')
+                                    : (activeStudent.details_json?.marital_status || '独身')}
                                 </td>
                               </tr>
 
@@ -1249,7 +1543,9 @@ export default function StudentListPage() {
                                   }}
                                 >
                                   <div>生年月日</div>
-                                  <div style={{ fontSize: '9px', color: '#475569' }}>জন্ম তারিখ</div>
+                                  {printVersion === 'student' && (
+                                    <div style={{ fontSize: '9px', color: '#475569' }}>জন্ম তারিখ</div>
+                                  )}
                                 </td>
                                 <td
                                   style={{
@@ -1276,7 +1572,9 @@ export default function StudentListPage() {
                                   }}
                                 >
                                   <div>年齢</div>
-                                  <div style={{ fontSize: '9px', color: '#475569' }}>বয়স</div>
+                                  {printVersion === 'student' && (
+                                    <div style={{ fontSize: '9px', color: '#475569' }}>বয়স</div>
+                                  )}
                                 </td>
                                 <td
                                   style={{
@@ -1287,7 +1585,14 @@ export default function StudentListPage() {
                                     fontSize: '12px',
                                   }}
                                 >
-                                  {activeStudent.details_json?.age_display || '—'}
+                                  {printVersion === 'japanese'
+                                    ? formatPureJapaneseAge(
+                                        activeStudent.details_json?.age_display,
+                                        activeStudent.details_json?.dob_japanese || activeStudent.date_of_birth
+                                      )
+                                    : (activeStudent.details_json?.age_display ||
+                                        normalizeCandidateAge('', activeStudent.details_json?.dob_japanese || activeStudent.date_of_birth) ||
+                                        '—')}
                                 </td>
                               </tr>
 
@@ -1305,7 +1610,9 @@ export default function StudentListPage() {
                                   }}
                                 >
                                   <div>連絡先</div>
-                                  <div style={{ fontSize: '9px', color: '#475569' }}>ঠিকানা</div>
+                                  {printVersion === 'student' && (
+                                    <div style={{ fontSize: '9px', color: '#475569' }}>ঠিকানা</div>
+                                  )}
                                 </td>
                                 <td
                                   colSpan={3}
@@ -1318,7 +1625,9 @@ export default function StudentListPage() {
                                     wordBreak: 'break-word',
                                   }}
                                 >
-                                  {activeStudent.details_json?.address || '—'}
+                                  {printVersion === 'japanese'
+                                    ? stripBengali(activeStudent.details_json?.address) || '—'
+                                    : (activeStudent.details_json?.address || '—')}
                                 </td>
                               </tr>
 
@@ -1336,7 +1645,9 @@ export default function StudentListPage() {
                                   }}
                                 >
                                   <div>電話</div>
-                                  <div style={{ fontSize: '9px', color: '#475569' }}>ফোন</div>
+                                  {printVersion === 'student' && (
+                                    <div style={{ fontSize: '9px', color: '#475569' }}>ফোন</div>
+                                  )}
                                 </td>
                                 <td
                                   colSpan={3}
@@ -1377,7 +1688,7 @@ export default function StudentListPage() {
                           ) : (
                             <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '11.5px' }}>
                               <Users size={32} style={{ margin: '0 auto 4px auto' }} />
-                              <div>写真 / ছবি</div>
+                              <div>{printVersion === 'japanese' ? '写真' : '写真 / ছবি'}</div>
                             </div>
                           )}
                         </div>
@@ -1413,7 +1724,7 @@ export default function StudentListPage() {
                     }}
                   >
                     <span style={{ width: '4px', height: '14px', background: '#c00000', borderRadius: '2px', display: 'inline-block', flexShrink: 0 }} />
-                    <span>個人情報 / ব্যক্তিগত তথ্য</span>
+                    <span>{printVersion === 'japanese' ? '個人情報' : '個人情報 / ব্যক্তিগত তথ্য'}</span>
                   </div>
 
                   <div style={{ border: '1.5px solid #2b5585', background: '#ffffff', width: '100%', boxSizing: 'border-box' }}>
@@ -1431,26 +1742,36 @@ export default function StudentListPage() {
                         <tr style={{ borderBottom: '1px solid #2b5585' }}>
                           <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
                             <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>視力</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>দৃষ্টিশক্তি</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>দৃষ্টিশক্তি</div>}
                           </td>
-                          <td style={{ padding: '4px 6px', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11.5px', whiteSpace: 'nowrap' }}>
-                            {activeStudent.details_json?.eyesight || '—'}
+                          <td style={{ padding: '3px 4px', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11px', letterSpacing: '-0.2px', whiteSpace: 'nowrap' }}>
+                            {(() => {
+                              const raw = activeStudent.details_json?.eyesight;
+                              if (!raw) return '—';
+                              const clean = raw.replace(/\s*\([^)]*\)/g, '').trim();
+                              return printVersion === 'japanese' ? stripBengali(clean) || '—' : (clean || '—');
+                            })()}
                           </td>
                           <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
                             <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>色覚異常</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>বর্ণান্ধতা</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>বর্ণান্ধতা</div>}
                           </td>
                           <td style={{ padding: '4px 6px', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11.5px' }}>
-                            {activeStudent.details_json?.color_blindness || '—'}
+                            {printVersion === 'japanese'
+                              ? stripBengali(activeStudent.details_json?.color_blindness) || '—'
+                              : (activeStudent.details_json?.color_blindness || '—')}
                           </td>
                           <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
                             <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>利き手</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>প্রভাবশালী হাত</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>প্রভাবশালী হাত</div>}
                           </td>
                           <td style={{ padding: '3px 4px', textAlign: 'center', wordBreak: 'break-word' }}>
                             {(() => {
                               const val = activeStudent.details_json?.dominant_hand;
                               if (!val) return '—';
+                              if (printVersion === 'japanese') {
+                                return <span style={{ fontWeight: 600, fontSize: '11px' }}>{stripBengali(val)}</span>;
+                              }
                               if (val.includes(' / ')) {
                                 const [jp, bn] = val.split(' / ');
                                 return (
@@ -1469,24 +1790,26 @@ export default function StudentListPage() {
                         <tr style={{ borderBottom: '1px solid #2b5585' }}>
                           <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
                             <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>体重</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>শরীরের ওজন</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>শরীরের ওজন</div>}
                           </td>
                           <td style={{ padding: '4px 6px', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11.5px' }}>
                             {activeStudent.details_json?.body_weight || '—'}
                           </td>
                           <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
                             <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>身長</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>উচ্চতা</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>উচ্চতা</div>}
                           </td>
                           <td style={{ padding: '4px 6px', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11.5px' }}>
                             {activeStudent.details_json?.height || '—'}
                           </td>
                           <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
                             <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>入れ墨・手術</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>ট্যাটু / সার্জারি</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>ট্যাটু / সার্জারি</div>}
                           </td>
                           <td style={{ padding: '4px 6px', fontWeight: 600, color: '#000000', textAlign: 'center', fontSize: '11.5px' }}>
-                            {activeStudent.details_json?.tattoo_surgery || '—'}
+                            {printVersion === 'japanese'
+                              ? stripBengali(activeStudent.details_json?.tattoo_surgery) || '—'
+                              : (activeStudent.details_json?.tattoo_surgery || '—')}
                           </td>
                         </tr>
 
@@ -1494,26 +1817,33 @@ export default function StudentListPage() {
                         <tr style={{ borderBottom: '1px solid #2b5585' }}>
                           <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
                             <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>タバコ</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>ধূমপান?</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>ধূমপান?</div>}
                           </td>
                           <td style={{ padding: '4px 6px', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11.5px' }}>
-                            {activeStudent.details_json?.smoking || '—'}
+                            {printVersion === 'japanese'
+                              ? stripBengali(activeStudent.details_json?.smoking) || '—'
+                              : (activeStudent.details_json?.smoking || '—')}
                           </td>
                           <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
                             <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>お酒</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>মদ পান?</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>মদ পান?</div>}
                           </td>
                           <td style={{ padding: '4px 6px', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11.5px' }}>
-                            {activeStudent.details_json?.alcohol || '—'}
+                            {printVersion === 'japanese'
+                              ? stripBengali(activeStudent.details_json?.alcohol) || '—'
+                              : (activeStudent.details_json?.alcohol || '—')}
                           </td>
                           <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
                             <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>血液型</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>রক্তের ধরন</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>রক্তের ধরন</div>}
                           </td>
                           <td style={{ padding: '3px 4px', textAlign: 'center', wordBreak: 'break-word' }}>
                             {(() => {
                               const val = activeStudent.details_json?.blood_type;
                               if (!val) return '—';
+                              if (printVersion === 'japanese') {
+                                return <span style={{ fontWeight: 700, fontSize: '11px' }}>{stripBengali(val)}</span>;
+                              }
                               if (val.includes(' / ')) {
                                 const [jp, bn] = val.split(' / ');
                                 return (
@@ -1532,17 +1862,25 @@ export default function StudentListPage() {
                         <tr style={{ borderBottom: '1px solid #2b5585' }}>
                           <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
                             <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>趣味</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>শখ</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>শখ</div>}
                           </td>
                           <td colSpan={2} style={{ padding: '4px 8px', color: '#000000', borderRight: '1px solid #2b5585', lineHeight: 1.35, fontSize: '11px', wordBreak: 'break-word' }}>
-                            {activeStudent.details_json?.hobbies || '—'}
+                            {formatCvFieldValue(
+                              activeStudent.details_json?.hobbies,
+                              activeStudent.details_json?.hobbies_original_bn || (activeStudent.details_json as any)?.hobbiesOriginalBn,
+                              printVersion
+                            )}
                           </td>
                           <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
                             <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>性格</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>ব্যক্তিত্ব</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>ব্যক্তিত্ব</div>}
                           </td>
                           <td colSpan={2} style={{ padding: '4px 8px', color: '#000000', lineHeight: 1.35, fontSize: '11px', wordBreak: 'break-word' }}>
-                            {activeStudent.details_json?.personality || '—'}
+                            {formatCvFieldValue(
+                              activeStudent.details_json?.personality,
+                              activeStudent.details_json?.personality_original_bn || (activeStudent.details_json as any)?.personalityOriginalBn,
+                              printVersion
+                            )}
                           </td>
                         </tr>
 
@@ -1550,24 +1888,30 @@ export default function StudentListPage() {
                         <tr style={{ borderBottom: '1px solid #2b5585' }}>
                           <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
                             <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>料理経験</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>রান্না</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>রান্না</div>}
                           </td>
                           <td style={{ padding: '4px 6px', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11.5px' }}>
-                            {activeStudent.details_json?.cooking || '—'}
+                            {printVersion === 'japanese'
+                              ? stripBengali(activeStudent.details_json?.cooking) || '—'
+                              : (activeStudent.details_json?.cooking || '—')}
                           </td>
                           <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
                             <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>病歴</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>চিকিৎসা ইতিহাস</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>চিকিৎসা ইতিহাস</div>}
                           </td>
                           <td style={{ padding: '4px 6px', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11.5px' }}>
-                            {activeStudent.details_json?.medical_history || '—'}
+                            {printVersion === 'japanese'
+                              ? stripBengali(activeStudent.details_json?.medical_history) || '—'
+                              : (activeStudent.details_json?.medical_history || '—')}
                           </td>
                           <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
                             <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>集団生活</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>গ্রুপ লিভিং</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>গ্রুপ লিভিং</div>}
                           </td>
                           <td style={{ padding: '4px 6px', fontWeight: 600, color: '#000000', textAlign: 'center', fontSize: '11.5px' }}>
-                            {activeStudent.details_json?.group_living || '—'}
+                            {printVersion === 'japanese'
+                              ? stripBengali(activeStudent.details_json?.group_living) || '—'
+                              : (activeStudent.details_json?.group_living || '—')}
                           </td>
                         </tr>
 
@@ -1575,12 +1919,15 @@ export default function StudentListPage() {
                         <tr style={{ borderBottom: '1px solid #2b5585' }}>
                           <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
                             <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>個人収入</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>ব্যক্তিগত আয়</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>ব্যক্তিগত আয়</div>}
                           </td>
                           <td colSpan={2} style={{ padding: '3px 4px', borderRight: '1px solid #2b5585', textAlign: 'center', wordBreak: 'break-word' }}>
                             {(() => {
                               const val = activeStudent.details_json?.personal_income;
                               if (!val) return '—';
+                              if (printVersion === 'japanese') {
+                                return <span style={{ fontWeight: 600, fontSize: '11px' }}>{formatPureJapaneseIncome(val)}</span>;
+                              }
                               if (val.includes(' / ')) {
                                 const [jp, bn] = val.split(' / ');
                                 return (
@@ -1595,12 +1942,15 @@ export default function StudentListPage() {
                           </td>
                           <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
                             <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>5年貯金目標</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>৫বছরে সঞ্চয়</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>৫বছরে সঞ্চয়</div>}
                           </td>
                           <td colSpan={2} style={{ padding: '3px 4px', textAlign: 'center', wordBreak: 'break-word' }}>
                             {(() => {
                               const val = activeStudent.details_json?.target_savings_5years;
                               if (!val) return '—';
+                              if (printVersion === 'japanese') {
+                                return <span style={{ fontWeight: 800, color: '#047857', fontSize: '11.5px' }}>{formatPureJapaneseSavings(val)}</span>;
+                              }
                               if (val.includes(' / ')) {
                                 const [jp, bn] = val.split(' / ');
                                 return (
@@ -1619,10 +1969,14 @@ export default function StudentListPage() {
                         <tr style={{ borderBottom: '1px solid #2b5585' }}>
                           <td style={{ background: '#e8f0fe', padding: '5px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
                             <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>志望動機</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>অনুপ্রেরণা</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>অনুপ্রেরণা</div>}
                           </td>
                           <td colSpan={5} style={{ padding: '5px 8px', color: '#000000', lineHeight: 1.4, fontSize: '11px', wordBreak: 'break-word' }}>
-                            {activeStudent.details_json?.motivation || '—'}
+                            {formatCvFieldValue(
+                              activeStudent.details_json?.motivation,
+                              activeStudent.details_json?.motivation_original_bn || (activeStudent.details_json as any)?.motivationOriginalBn,
+                              printVersion
+                            )}
                           </td>
                         </tr>
 
@@ -1630,10 +1984,14 @@ export default function StudentListPage() {
                         <tr style={{ borderBottom: '1px solid #2b5585' }}>
                           <td style={{ background: '#e8f0fe', padding: '5px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
                             <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>帰国後計画</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>ভবিষ্যৎ পরিকল্পনা</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>ভবিষ্যৎ পরিকল্পনা</div>}
                           </td>
                           <td colSpan={5} style={{ padding: '5px 8px', color: '#000000', lineHeight: 1.4, fontSize: '11px', wordBreak: 'break-word' }}>
-                            {activeStudent.details_json?.future_plan_after_japan || '—'}
+                            {formatCvFieldValue(
+                              activeStudent.details_json?.future_plan_after_japan || (activeStudent.details_json as any)?.futurePlanAfterJapan,
+                              activeStudent.details_json?.future_plan_original_bn || (activeStudent.details_json as any)?.futurePlanOriginalBn,
+                              printVersion
+                            )}
                           </td>
                         </tr>
 
@@ -1641,17 +1999,21 @@ export default function StudentListPage() {
                         <tr>
                           <td style={{ background: '#e8f0fe', padding: '5px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
                             <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>在留資格申請歴</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>ভিসা আবেদন</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>ভিসা আবেদন</div>}
                           </td>
                           <td colSpan={2} style={{ padding: '5px 8px', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', fontSize: '11.5px' }}>
-                            {activeStudent.details_json?.japan_visa_applied_before || '—'}
+                            {printVersion === 'japanese'
+                              ? stripBengali(activeStudent.details_json?.japan_visa_applied_before) || '—'
+                              : (activeStudent.details_json?.japan_visa_applied_before || '—')}
                           </td>
                           <td style={{ background: '#e8f0fe', padding: '5px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
                             <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>申請資格</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>ভিসার ধরন</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>ভিসার ধরন</div>}
                           </td>
                           <td colSpan={2} style={{ padding: '5px 8px', fontWeight: 600, color: '#000000', fontSize: '11.5px' }}>
-                            {activeStudent.details_json?.japan_visa_type_applied || '—'}
+                            {printVersion === 'japanese'
+                              ? stripBengali(activeStudent.details_json?.japan_visa_type_applied) || '—'
+                              : (activeStudent.details_json?.japan_visa_type_applied || '—')}
                           </td>
                         </tr>
                       </tbody>
@@ -1686,7 +2048,7 @@ export default function StudentListPage() {
                     }}
                   >
                     <span style={{ width: '4px', height: '14px', background: '#c00000', borderRadius: '2px', display: 'inline-block', flexShrink: 0 }} />
-                    <span>学歴 / শিক্ষাগত যোগ্যতা</span>
+                    <span>{printVersion === 'japanese' ? '学歴' : '学歴 / শিক্ষাগত যোগ্যতা'}</span>
                   </div>
 
                   <div style={{ border: '1.5px solid #2b5585', background: '#ffffff', width: '100%', boxSizing: 'border-box' }}>
@@ -1702,23 +2064,23 @@ export default function StudentListPage() {
                         <tr style={{ background: '#e8f0fe', borderBottom: '1px solid #2b5585' }}>
                           <th style={{ padding: '5px 6px', fontWeight: 700, color: '#1f3864', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11px', lineHeight: 1.2 }}>
                             <div>開始年</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>শুরুর বছর</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>শুরুর বছর</div>}
                           </th>
                           <th style={{ padding: '5px 6px', fontWeight: 700, color: '#1f3864', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11px', lineHeight: 1.2 }}>
                             <div>終了年</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>সমাপ্তি বছর</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>সমাপ্তি বছর</div>}
                           </th>
                           <th style={{ padding: '5px 6px', fontWeight: 700, color: '#1f3864', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11px', lineHeight: 1.2 }}>
                             <div>学校名</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>স্কুলের নাম</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>স্কুলের নাম</div>}
                           </th>
                           <th style={{ padding: '5px 6px', fontWeight: 700, color: '#1f3864', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11px', lineHeight: 1.2 }}>
                             <div>専攻</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>সাবজেক্ট</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>সাবজেক্ট</div>}
                           </th>
                           <th style={{ padding: '5px 6px', fontWeight: 700, color: '#1f3864', textAlign: 'center', fontSize: '11px', lineHeight: 1.2 }}>
                             <div>学位</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>যোগ্যতা</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>যোগ্যতা</div>}
                           </th>
                         </tr>
                       </thead>
@@ -1741,17 +2103,17 @@ export default function StudentListPage() {
                                 {edu.school_name || '—'}
                               </td>
                               <td style={{ padding: '4px 6px', textAlign: 'center', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', fontSize: '11.5px', wordBreak: 'break-word' }}>
-                                {edu.major_subject || '—'}
+                                {printVersion === 'japanese' ? stripBengali(edu.major_subject) || '—' : (edu.major_subject || '—')}
                               </td>
                               <td style={{ padding: '4px 6px', textAlign: 'center', fontWeight: 600, color: '#000000', fontSize: '11.5px', wordBreak: 'break-word' }}>
-                                {edu.qualification || '—'}
+                                {printVersion === 'japanese' ? stripBengali(edu.qualification) || '—' : (edu.qualification || '—')}
                               </td>
                             </tr>
                           ))
                         ) : (
                           <tr>
                             <td colSpan={5} style={{ padding: '6px', textAlign: 'center', color: '#64748b', fontSize: '11.5px' }}>
-                              なし / কোনো তথ্য নেই
+                              {printVersion === 'japanese' ? 'なし' : 'なし / কোনো তথ্য নেই'}
                             </td>
                           </tr>
                         )}
@@ -1787,7 +2149,7 @@ export default function StudentListPage() {
                     }}
                   >
                     <span style={{ width: '4px', height: '14px', background: '#c00000', borderRadius: '2px', display: 'inline-block', flexShrink: 0 }} />
-                    <span>その他言語 / অন্যান্য ভাষা</span>
+                    <span>{printVersion === 'japanese' ? 'その他言語' : 'その他言語 / অন্যান্য ভাষা'}</span>
                   </div>
 
                   <div style={{ border: '1.5px solid #2b5585', background: '#ffffff', width: '100%', boxSizing: 'border-box' }}>
@@ -1803,19 +2165,23 @@ export default function StudentListPage() {
                           {/* Mother tongue (Bengali) Label */}
                           <td style={{ padding: '4px 8px', background: '#e8f0fe', borderRight: '1px solid #2b5585', color: '#1f3864', lineHeight: 1.25, fontSize: '11px' }}>
                             <div style={{ fontWeight: 700 }}>母国語（ベンガル語）【読み書き】</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>মাতৃভাষা (বাংলা)</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>মাতৃভাষা (বাংলা)</div>}
                           </td>
                           <td style={{ padding: '4px 6px', textAlign: 'center', borderRight: '1px solid #2b5585', fontWeight: 700, color: '#000000', fontSize: '12.5px' }}>
-                            {formatLanguageDisplay(activeStudent.details_json?.language_bengali)}
+                            {printVersion === 'japanese'
+                              ? formatPureJapaneseLanguage(activeStudent.details_json?.language_bengali)
+                              : formatLanguageDisplay(activeStudent.details_json?.language_bengali)}
                           </td>
 
                           {/* English Label */}
                           <td style={{ padding: '4px 8px', background: '#e8f0fe', borderRight: '1px solid #2b5585', color: '#1f3864', lineHeight: 1.25, fontSize: '11px' }}>
                             <div style={{ fontWeight: 700 }}>英語【読み書き】</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>ইংরেজি</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>ইংরেজি</div>}
                           </td>
                           <td style={{ padding: '4px 6px', textAlign: 'center', fontWeight: 700, color: '#000000', fontSize: '12.5px' }}>
-                            {formatLanguageDisplay(activeStudent.details_json?.language_english)}
+                            {printVersion === 'japanese'
+                              ? formatPureJapaneseLanguage(activeStudent.details_json?.language_english)
+                              : formatLanguageDisplay(activeStudent.details_json?.language_english)}
                           </td>
                         </tr>
                       </tbody>
@@ -1850,7 +2216,7 @@ export default function StudentListPage() {
                     }}
                   >
                     <span style={{ width: '4px', height: '14px', background: '#c00000', borderRadius: '2px', display: 'inline-block', flexShrink: 0 }} />
-                    <span>職歴 / কাজের ইতিহাস</span>
+                    <span>{printVersion === 'japanese' ? '職歴' : '職歴 / কাজের ইতিহাস'}</span>
                   </div>
 
                   <div style={{ border: '1.5px solid #2b5585', background: '#ffffff', width: '100%', boxSizing: 'border-box' }}>
@@ -1865,19 +2231,19 @@ export default function StudentListPage() {
                         <tr style={{ background: '#e8f0fe', borderBottom: '1px solid #2b5585' }}>
                           <th style={{ padding: '5px 6px', fontWeight: 700, color: '#1f3864', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11px', lineHeight: 1.2 }}>
                             <div>開始年</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>শুরুর বছর</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>শুরুর বছর</div>}
                           </th>
                           <th style={{ padding: '5px 6px', fontWeight: 700, color: '#1f3864', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11px', lineHeight: 1.2 }}>
                             <div>終了年</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>সমাপ্তি বছর</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>সমাপ্তি বছর</div>}
                           </th>
                           <th style={{ padding: '5px 6px', fontWeight: 700, color: '#1f3864', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11px', lineHeight: 1.2 }}>
                             <div>会社名</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>কোম্পানির নাম</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>কোম্পানির নাম</div>}
                           </th>
                           <th style={{ padding: '5px 6px', fontWeight: 700, color: '#1f3864', textAlign: 'center', fontSize: '11px', lineHeight: 1.2 }}>
                             <div>業務内容</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>কাজের বিবরণ</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>কাজের বিবরণ</div>}
                           </th>
                         </tr>
                       </thead>
@@ -1900,14 +2266,18 @@ export default function StudentListPage() {
                                 {work.company_name || '—'}
                               </td>
                               <td style={{ padding: '4px 6px', textAlign: 'left', color: '#000000', lineHeight: 1.35, fontSize: '11px', wordBreak: 'break-word' }}>
-                                {work.job_description || '—'}
+                                {formatCvFieldValue(
+                                  work.job_description,
+                                  work.job_description_original_bn || work.jobDescriptionOriginalBn,
+                                  printVersion
+                                )}
                               </td>
                             </tr>
                           ))
                         ) : (
                           <tr>
                             <td colSpan={4} style={{ padding: '6px', textAlign: 'center', color: '#64748b', fontSize: '11.5px' }}>
-                              なし / নেই
+                              {printVersion === 'japanese' ? 'なし' : 'なし / নেই'}
                             </td>
                           </tr>
                         )}
@@ -1943,7 +2313,7 @@ export default function StudentListPage() {
                     }}
                   >
                     <span style={{ width: '4px', height: '14px', background: '#c00000', borderRadius: '2px', display: 'inline-block', flexShrink: 0 }} />
-                    <span>家族 / পরিবার</span>
+                    <span>{printVersion === 'japanese' ? '家族' : '家族 / পরিবার'}</span>
                   </div>
 
                   <div style={{ border: '1.5px solid #2b5585', background: '#ffffff', width: '100%', boxSizing: 'border-box' }}>
@@ -1959,23 +2329,23 @@ export default function StudentListPage() {
                         <tr style={{ background: '#e8f0fe', borderBottom: '1px solid #2b5585' }}>
                           <th style={{ padding: '5px 6px', fontWeight: 700, color: '#1f3864', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11px', lineHeight: 1.2 }}>
                             <div>氏名</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>নাম</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>নাম</div>}
                           </th>
                           <th style={{ padding: '5px 6px', fontWeight: 700, color: '#1f3864', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11px', lineHeight: 1.2 }}>
                             <div>続柄</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>সম্পর্ক</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>সম্পর্ক</div>}
                           </th>
                           <th style={{ padding: '5px 6px', fontWeight: 700, color: '#1f3864', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11px', lineHeight: 1.2 }}>
                             <div>年齢</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>বয়স</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>বয়স</div>}
                           </th>
                           <th style={{ padding: '5px 6px', fontWeight: 700, color: '#1f3864', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11px', lineHeight: 1.2 }}>
                             <div>職業</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>পেশা</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>পেশা</div>}
                           </th>
                           <th style={{ padding: '5px 6px', fontWeight: 700, color: '#1f3864', textAlign: 'center', fontSize: '11px', lineHeight: 1.2 }}>
                             <div>在日親族 & 家族の賛成</div>
-                            <div style={{ fontSize: '9.5px', color: '#475569' }}>জাপানে আত্মীয় ও পরিবারের সম্মতি</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>জাপানে আত্মীয় ও পরিবারের সম্মতি</div>}
                           </th>
                         </tr>
                       </thead>
@@ -2000,16 +2370,16 @@ export default function StudentListPage() {
                                 }}
                               >
                                 <td style={{ padding: '4px 6px', textAlign: 'center', fontWeight: 700, color: '#000000', borderRight: '1px solid #2b5585', fontSize: '12px', wordBreak: 'break-word' }}>
-                                  {m?.name || (rIdx === 0 && members.length === 0 ? 'なし / নেই' : '—')}
+                                  {m?.name || (rIdx === 0 && members.length === 0 ? (printVersion === 'japanese' ? 'なし' : 'なし / নেই') : '—')}
                                 </td>
                                 <td style={{ padding: '4px 6px', textAlign: 'center', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', fontSize: '11.5px' }}>
-                                  {m?.relationship || '—'}
+                                  {printVersion === 'japanese' ? stripBengali(m?.relationship) || '—' : (m?.relationship || '—')}
                                 </td>
                                 <td style={{ padding: '4px 6px', textAlign: 'center', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', fontSize: '11.5px', whiteSpace: 'nowrap' }}>
-                                  {formatFamilyMemberAge(m?.age)}
+                                  {printVersion === 'japanese' ? formatPureJapaneseAge(m?.age) : formatFamilyMemberAge(m?.age)}
                                 </td>
                                 <td style={{ padding: '4px 6px', textAlign: 'center', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', fontSize: '11.5px', wordBreak: 'break-word' }}>
-                                  {m?.occupation || '—'}
+                                  {printVersion === 'japanese' ? stripBengali(m?.occupation) || '—' : (m?.occupation || '—')}
                                 </td>
 
                                 {/* Right Combined Column: Relatives in Japan & Family Support */}
@@ -2025,7 +2395,12 @@ export default function StudentListPage() {
                                       wordBreak: 'break-word',
                                     }}
                                   >
-                                    <span style={{ fontWeight: 700, color: '#1f3864' }}>在日親族 / জাপানে আত্মীয়:</span> {activeStudent.details_json?.relatives_in_japan || '—'}
+                                    <span style={{ fontWeight: 700, color: '#1f3864' }}>
+                                      {printVersion === 'japanese' ? '在日親族:' : '在日親族 / জাপানে আত্মীয়:'}
+                                    </span>{' '}
+                                    {printVersion === 'japanese'
+                                      ? stripBengali(activeStudent.details_json?.relatives_in_japan) || '—'
+                                      : (activeStudent.details_json?.relatives_in_japan || '—')}
                                   </td>
                                 )}
 
@@ -2041,7 +2416,12 @@ export default function StudentListPage() {
                                       wordBreak: 'break-word',
                                     }}
                                   >
-                                    <span style={{ fontWeight: 700, color: '#1f3864' }}>家族の賛成 / পরিবারের সম্মতি:</span> {activeStudent.details_json?.family_support_japan || '—'}
+                                    <span style={{ fontWeight: 700, color: '#1f3864' }}>
+                                      {printVersion === 'japanese' ? '家族の賛成:' : '家族の賛成 / পরিবারের সম্মতি:'}
+                                    </span>{' '}
+                                    {printVersion === 'japanese'
+                                      ? stripBengali(activeStudent.details_json?.family_support_japan) || '—'
+                                      : (activeStudent.details_json?.family_support_japan || '—')}
                                   </td>
                                 )}
                               </tr>
@@ -2079,7 +2459,7 @@ export default function StudentListPage() {
                     }}
                   >
                     <span style={{ width: '4px', height: '14px', background: '#c00000', borderRadius: '2px', display: 'inline-block', flexShrink: 0 }} />
-                    <span>評価 / মূল্যায়ন</span>
+                    <span>{printVersion === 'japanese' ? '評価' : '評価 / মূল্যায়ন'}</span>
                   </div>
 
                   <div style={{ border: '1.5px solid #2b5585', background: '#ffffff', width: '100%', boxSizing: 'border-box' }}>
@@ -2190,12 +2570,118 @@ export default function StudentListPage() {
               </div>
               <div>
                 <h4 style={{ margin: 0, fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
-                  Set Print Number (番号/no)
+                  Print Options & Number (印刷設定)
                 </h4>
                 <p style={{ margin: '3px 0 0 0', fontSize: '12.5px', color: '#64748b' }}>
-                  Specify the number to print inside the top-right &ldquo;番号/no&rdquo; box of the CV.
+                  Select the print version and set the number inside the &ldquo;番号&rdquo; box.
                 </p>
               </div>
+            </div>
+
+            {/* Print Format / Version Selection inside Modal */}
+            {/* Print Format / Version Selection inside Modal (Only shown if AI is enabled) */}
+            {aiEnabled && (
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#1e293b', marginBottom: '6px' }}>
+                  印刷バージョン / Select Print Format:
+                </label>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: '8px',
+                    background: '#f1f5f9',
+                    padding: '4px',
+                    borderRadius: '10px',
+                    border: '1.5px solid #cbd5e1',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setPrintVersion('japanese')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: effectivePrintVersion === 'japanese' ? '#1f3864' : 'transparent',
+                      color: effectivePrintVersion === 'japanese' ? '#ffffff' : '#475569',
+                      fontSize: '12.5px',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      boxShadow: effectivePrintVersion === 'japanese' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
+                    }}
+                  >
+                    <span>🇯🇵</span>
+                    <span>日本語版 (Pure Japanese)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPrintVersion('student')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: effectivePrintVersion === 'student' ? '#1f3864' : 'transparent',
+                      color: effectivePrintVersion === 'student' ? '#ffffff' : '#475569',
+                      fontSize: '12.5px',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      boxShadow: effectivePrintVersion === 'student' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
+                    }}
+                  >
+                    <span>🇧🇩</span>
+                    <span>学生用 (Bilingual)</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Export PDF Filename Display */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 12px',
+                background: '#f8fafc',
+                border: '1px solid #cbd5e1',
+                borderRadius: '8px',
+                marginBottom: '16px',
+                fontSize: '12px',
+              }}
+            >
+              <FileText size={16} color="#1f3864" />
+              <span style={{ fontWeight: 700, color: '#334155' }}>
+                出力PDF名 / Export PDF:
+              </span>
+              <span
+                style={{
+                  fontWeight: 800,
+                  color: '#1d4ed8',
+                  fontFamily: 'monospace',
+                  fontSize: '13px',
+                  background: '#eff6ff',
+                  padding: '2px 8px',
+                  borderRadius: '4px',
+                  border: '1px solid #bfdbfe',
+                }}
+              >
+                {getExportPdfFileName(
+                  activeStudent?.details_json?.name_native || activeStudent?.full_name,
+                  effectivePrintVersion
+                )}
+                .pdf
+              </span>
             </div>
 
             {/* Live Preview Box & Input */}
@@ -2213,7 +2699,7 @@ export default function StudentListPage() {
             >
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
                 <span style={{ fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-                  番号 / no
+                  {printVersion === 'japanese' ? '番号' : '番号 / no'}
                 </span>
                 <div
                   style={{

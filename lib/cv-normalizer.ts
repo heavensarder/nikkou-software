@@ -35,7 +35,7 @@ export function normalizeMaritalStatus(val: any): string {
   if (s.includes('独身') || s.includes('single') || s.includes('unmarried') || s.includes('অবিবাহিত')) {
     return '独身 / অবিবাহিত';
   }
-  return '独身 / অবিবাহিত';
+  return '';
 }
 
 export function normalizeYesNo(val: any, defaultNo: boolean = true): string {
@@ -427,44 +427,73 @@ export function normalizeOccupation(val: any): string {
 export function normalizeFamilyAge(val: any): string {
   if (!val) return '';
   const s = String(val).trim();
-  const match = s.match(/(\d+)/);
+  const bnDigits: { [k: string]: string } = {
+    '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4',
+    '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9',
+  };
+  const normalized = s.replace(/[০-৯]/g, (d) => bnDigits[d] || d);
+  const match = normalized.match(/(\d+)/);
   if (match) {
     const ageNum = parseInt(match[1], 10);
-    if (ageNum >= 1 && ageNum <= 100) {
-      return `${ageNum}歳 / ${toBengaliNumber(ageNum)} বছর`;
+    if (ageNum >= 1 && ageNum <= 120) {
+      return `${ageNum}歳 / ${ageNum} বছর`;
     }
   }
   return s;
 }
 
-export function normalizeCandidateAge(val: any, dob?: string): string {
+export function calculateAgeFromDob(dob: any): number | null {
+  if (!dob) return null;
+  const isoStr = normalizeCandidateDob(dob);
+  if (!isoStr) return null;
+  const parts = isoStr.split('-');
+  if (parts.length !== 3) return null;
+
+  const birthYear = parseInt(parts[0], 10);
+  const birthMonth = parseInt(parts[1], 10);
+  const birthDay = parseInt(parts[2], 10);
+
+  if (isNaN(birthYear) || isNaN(birthMonth) || isNaN(birthDay)) return null;
+
+  const today = new Date();
+  let age = today.getFullYear() - birthYear;
+  const currentMonth = today.getMonth() + 1;
+  const currentDay = today.getDate();
+
+  if (currentMonth < birthMonth || (currentMonth === birthMonth && currentDay < birthDay)) {
+    age--;
+  }
+
+  if (age >= 0 && age <= 120) {
+    return age;
+  }
+  return null;
+}
+
+export function normalizeCandidateAge(val: any, dob?: any): string {
+  if (dob) {
+    const calculated = calculateAgeFromDob(dob);
+    if (calculated !== null) {
+      return `${calculated}歳 / ${calculated} বছর`;
+    }
+  }
+
   if (val) {
     const s = String(val).trim();
-    const match = s.match(/(\d+)/);
+    const bnDigits: { [k: string]: string } = {
+      '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4',
+      '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9',
+    };
+    const normalized = s.replace(/[০-৯]/g, (d) => bnDigits[d] || d);
+    const match = normalized.match(/(\d+)/);
     if (match) {
       const ageNum = parseInt(match[1], 10);
-      if (ageNum >= 1 && ageNum <= 100) {
-        return `${ageNum}歳 / ${toBengaliNumber(ageNum)} বছর`;
+      if (ageNum >= 1 && ageNum <= 120) {
+        return `${ageNum}歳 / ${ageNum} বছর`;
       }
     }
   }
-  if (dob) {
-    const ymd = String(dob).match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
-    if (ymd) {
-      const bYear = parseInt(ymd[1], 10);
-      const bMonth = parseInt(ymd[2], 10) - 1;
-      const bDay = parseInt(ymd[3], 10);
-      const today = new Date();
-      let ageNum = today.getFullYear() - bYear;
-      const m = today.getMonth() - bMonth;
-      if (m < 0 || (m === 0 && today.getDate() < bDay)) {
-        ageNum--;
-      }
-      if (ageNum > 0 && ageNum < 100) {
-        return `${ageNum}歳 / ${toBengaliNumber(ageNum)} বছর`;
-      }
-    }
-  }
+
   return String(val || '');
 }
 

@@ -15,19 +15,31 @@ import {
   Loader2,
   UserCheck,
   RotateCcw,
+  Link2,
+  Lock,
 } from 'lucide-react';
 import PhotoUploadField from '@/components/PhotoUploadField';
 import ProgramCategorySection from '@/components/ProgramCategorySection';
 import EducationHistorySection, { INITIAL_EDUCATION_ROWS } from '@/components/EducationHistorySection';
 import WorkHistorySection, { INITIAL_WORK_ROWS } from '@/components/WorkHistorySection';
 import FamilyInfoSection, { INITIAL_FAMILY_ROWS } from '@/components/FamilyInfoSection';
-import { EducationEntry, WorkExperienceEntry, FamilyMemberEntry } from '@/types/cv';
+import { EducationEntry, WorkExperienceEntry, FamilyMemberEntry, EYESIGHT_OPTIONS } from '@/types/cv';
+import EyesightField from '@/components/EyesightField';
+import TranslatableTextarea from '@/components/TranslatableTextarea';
 import styles from '../../../cv-maker.module.css';
 import {
   formatJapaneseBirthDate,
   formatReadableBirthDate,
   normalizeCandidateDob,
+  normalizeCandidateAge,
+  calculateAgeFromDob,
   normalizeLanguageProficiency,
+  normalizeGender,
+  normalizeMaritalStatus,
+  normalizeYesNo,
+  normalizeDominantHand,
+  normalizeBloodType,
+  normalizeJapanVisaType,
 } from '@/lib/cv-normalizer';
 export { formatJapaneseBirthDate };
 
@@ -39,6 +51,8 @@ function EditStudentCvContent() {
   const [loading, setLoading] = useState(true);
   const [studentCode, setStudentCode] = useState('');
   const [studentSource, setStudentSource] = useState('');
+  const [editToken, setEditToken] = useState('');
+  const [copiedEditLink, setCopiedEditLink] = useState(false);
 
   // Status
   const [status, setStatus] = useState('submitted');
@@ -70,7 +84,9 @@ function EditStudentCvContent() {
   const [smoking, setSmoking] = useState('');
   const [alcohol, setAlcohol] = useState('');
   const [hobbies, setHobbies] = useState('');
+  const [hobbiesOriginalBn, setHobbiesOriginalBn] = useState('');
   const [personality, setPersonality] = useState('');
+  const [personalityOriginalBn, setPersonalityOriginalBn] = useState('');
   const [cooking, setCooking] = useState('');
   const [groupLiving, setGroupLiving] = useState('');
   const [bloodType, setBloodType] = useState('');
@@ -78,7 +94,9 @@ function EditStudentCvContent() {
   const [personalIncome, setPersonalIncome] = useState('');
   const [targetSavings5Years, setTargetSavings5Years] = useState('');
   const [motivation, setMotivation] = useState('');
+  const [motivationOriginalBn, setMotivationOriginalBn] = useState('');
   const [futurePlanAfterJapan, setFuturePlanAfterJapan] = useState('');
+  const [futurePlanOriginalBn, setFuturePlanOriginalBn] = useState('');
   const [japanVisaAppliedBefore, setJapanVisaAppliedBefore] = useState('');
   const [japanVisaTypeApplied, setJapanVisaTypeApplied] = useState('');
 
@@ -110,6 +128,24 @@ function EditStudentCvContent() {
   const [draftSaveSuccess, setDraftSaveSuccess] = useState<string | null>(null);
   const serverDataRef = useRef<any>(null);
 
+  // AI status from system settings
+  const [aiEnabled, setAiEnabled] = useState(false);
+
+  useEffect(() => {
+    async function checkAiStatus() {
+      try {
+        const res = await fetch('/api/settings/ai');
+        if (res.ok) {
+          const data = await res.json();
+          setAiEnabled(Boolean(data.enabled));
+        }
+      } catch (err) {
+        console.error('Failed to load AI settings status', err);
+      }
+    }
+    checkAiStatus();
+  }, []);
+
   // Fetch initial student data
   useEffect(() => {
     async function loadStudent() {
@@ -132,6 +168,7 @@ function EditStudentCvContent() {
         serverDataRef.current = { student: s, details: d };
         setStudentCode(s.student_code || '');
         setStudentSource(s.source || '');
+        setEditToken(s.edit_token || '');
 
         // Clear any old local cache for this student to avoid stale overrides
         try {
@@ -146,8 +183,10 @@ function EditStudentCvContent() {
         setPhoto(d.photo_data || null);
         setFurigana(d.furigana || s.full_name || '');
         setFullName(d.name_native || s.full_name || '');
-        setGender(d.gender_label || (s.gender === 'female' ? '女性 / মহিলা' : '男性 / পুরুষ'));
-        setMaritalStatus(d.marital_status || '独身 / অবিবাহিত');
+        const rawGender = d.gender_label || s.gender || '';
+        setGender(normalizeGender(rawGender) || (rawGender === 'female' ? '女性 / মহিলা' : '男性 / পুরুষ'));
+        const rawMarital = d.marital_status || '';
+        setMaritalStatus(normalizeMaritalStatus(rawMarital) || rawMarital || '独身 / অবিবাহিত');
         let candidateDob = '';
         if (d.dob_japanese) {
           candidateDob = normalizeCandidateDob(d.dob_japanese);
@@ -156,30 +195,39 @@ function EditStudentCvContent() {
           candidateDob = normalizeCandidateDob(s.date_of_birth);
         }
         setDob(candidateDob);
-        setAge(d.age_display || '');
+        const calculatedAge = candidateDob ? calculateAgeFromDob(candidateDob) : null;
+        if (calculatedAge !== null) {
+          setAge(`${calculatedAge}歳 / ${calculatedAge} বছর`);
+        } else {
+          setAge(normalizeCandidateAge(d.age_display, candidateDob));
+        }
         setAddress(d.address || '');
         setPhone(s.phone || d.phone || '');
 
         setEyesight(d.eyesight || '');
-        setColorBlindness(d.color_blindness || '無 / না');
-        setDominantHand(d.dominant_hand || '右手 / ডান হাত');
+        setColorBlindness(d.color_blindness ? normalizeYesNo(d.color_blindness, true) : '無 / না');
+        setDominantHand(d.dominant_hand ? normalizeDominantHand(d.dominant_hand) : '右手 / ডান হাত');
         setBodyWeight(d.body_weight || '');
         setHeight(d.height || '');
-        setTattooSurgery(d.tattoo_surgery || '無 / না');
-        setSmoking(d.smoking || '無 / না');
-        setAlcohol(d.alcohol || '無 / না');
-        setBloodType(d.blood_type || '');
+        setTattooSurgery(d.tattoo_surgery ? normalizeYesNo(d.tattoo_surgery, true) : '無 / না');
+        setSmoking(d.smoking ? normalizeYesNo(d.smoking, true) : '無 / না');
+        setAlcohol(d.alcohol ? normalizeYesNo(d.alcohol, true) : '無 / না');
+        setBloodType(d.blood_type ? normalizeBloodType(d.blood_type) : '');
         setHobbies(d.hobbies || '');
+        setHobbiesOriginalBn(d.hobbies_original_bn || d.hobbiesOriginalBn || '');
         setPersonality(d.personality || '');
-        setCooking(d.cooking || '有 / হ্যাঁ');
-        setGroupLiving(d.group_living || '有 / হ্যাঁ');
-        setMedicalHistory(d.medical_history || '無 / না');
+        setPersonalityOriginalBn(d.personality_original_bn || d.personalityOriginalBn || '');
+        setCooking(d.cooking ? normalizeYesNo(d.cooking, false) : '有 / হ্যাঁ');
+        setGroupLiving(d.group_living ? normalizeYesNo(d.group_living, false) : '有 / হ্যাঁ');
+        setMedicalHistory(d.medical_history ? normalizeYesNo(d.medical_history, true) : '無 / না');
         setPersonalIncome(d.personal_income || '');
         setTargetSavings5Years(d.target_savings_5years || '');
         setMotivation(d.motivation || '');
+        setMotivationOriginalBn(d.motivation_original_bn || d.motivationOriginalBn || '');
         setFuturePlanAfterJapan(d.future_plan_after_japan || '');
-        setJapanVisaAppliedBefore(d.japan_visa_applied_before || '無 / না');
-        setJapanVisaTypeApplied(d.japan_visa_type_applied || '無 / না');
+        setFuturePlanOriginalBn(d.future_plan_original_bn || d.futurePlanOriginalBn || '');
+        setJapanVisaAppliedBefore(d.japan_visa_applied_before ? normalizeYesNo(d.japan_visa_applied_before, true) : '無 / না');
+        setJapanVisaTypeApplied(d.japan_visa_type_applied ? normalizeJapanVisaType(d.japan_visa_type_applied) : '無 / না');
 
         if (Array.isArray(d.education_history) && d.education_history.length > 0) {
           setEducationHistory(d.education_history);
@@ -255,7 +303,7 @@ function EditStudentCvContent() {
             name_native: fullName.trim(),
             gender_label: gender,
             marital_status: maritalStatus,
-            age_display: age.trim(),
+            age_display: normalizeCandidateAge(age, dob),
             dob_japanese: formatJapaneseBirthDate(dob),
             address: address.trim(),
             phone: phone.trim(),
@@ -326,14 +374,8 @@ function EditStudentCvContent() {
     setDob(selectedDate);
 
     if (selectedDate) {
-      const birthDate = new Date(selectedDate);
-      const today = new Date();
-      let calculatedAge = today.getFullYear() - birthDate.getFullYear();
-      const monthDiff = today.getMonth() - birthDate.getMonth();
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-        calculatedAge--;
-      }
-      if (calculatedAge >= 0) {
+      const calculatedAge = calculateAgeFromDob(selectedDate);
+      if (calculatedAge !== null) {
         setAge(`${calculatedAge}歳 / ${calculatedAge} বছর`);
       }
     } else {
@@ -371,7 +413,7 @@ function EditStudentCvContent() {
             name_native: fullName.trim(),
             gender_label: gender,
             marital_status: maritalStatus,
-            age_display: age.trim(),
+            age_display: normalizeCandidateAge(age, dob),
             dob_japanese: formatJapaneseBirthDate(dob),
             address: address.trim(),
             phone: phone.trim(),
@@ -385,7 +427,9 @@ function EditStudentCvContent() {
             smoking: smoking,
             alcohol: alcohol,
             hobbies: hobbies.trim(),
+            hobbies_original_bn: hobbiesOriginalBn.trim(),
             personality: personality.trim(),
+            personality_original_bn: personalityOriginalBn.trim(),
             cooking: cooking,
             group_living: groupLiving,
             blood_type: bloodType,
@@ -393,7 +437,9 @@ function EditStudentCvContent() {
             personal_income: personalIncome.trim(),
             target_savings_5years: targetSavings5Years.trim(),
             motivation: motivation.trim(),
+            motivation_original_bn: motivationOriginalBn.trim(),
             future_plan_after_japan: futurePlanAfterJapan.trim(),
+            future_plan_original_bn: futurePlanOriginalBn.trim(),
             japan_visa_applied_before: japanVisaAppliedBefore,
             japan_visa_type_applied: japanVisaTypeApplied.trim(),
             // Section 3: 学歴 / শিক্ষাগত যোগ্যতা
@@ -445,6 +491,15 @@ function EditStudentCvContent() {
     }
   };
 
+  const handleCopyStudentEditLink = () => {
+    if (!editToken) return;
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const editUrl = `${origin}/cv-form/edit/${editToken}`;
+    navigator.clipboard.writeText(editUrl);
+    setCopiedEditLink(true);
+    setTimeout(() => setCopiedEditLink(false), 2500);
+  };
+
   if (loading) {
     return (
       <div className={styles.pageContainer} style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -478,6 +533,59 @@ function EditStudentCvContent() {
             <span className={styles.codePill} style={{ fontSize: '13px', padding: '6px 12px' }}>
               {studentCode}
             </span>
+          )}
+
+          {/* Student Public Edit Link */}
+          {status === 'verified' ? (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 14px',
+                borderRadius: '8px',
+                border: '1.5px solid #a7f3d0',
+                background: '#ecfdf5',
+                color: '#047857',
+                fontSize: '12.5px',
+                fontWeight: 700,
+              }}
+              title="This application is verified and locked from editing."
+            >
+              <Lock size={14} />
+              <span>Edit Link Locked</span>
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={handleCopyStudentEditLink}
+              disabled={!editToken}
+              className={`${styles.secondaryBtn} ${copiedEditLink ? styles.copyBtnSuccess : ''}`}
+              style={{
+                padding: '8px 14px',
+                fontSize: '13px',
+                fontWeight: 700,
+                color: copiedEditLink ? '#059669' : '#0284c7',
+                borderColor: copiedEditLink ? '#a7f3d0' : '#bae6fd',
+                background: copiedEditLink ? '#ecfdf5' : '#f0f9ff',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+              title="Copy shareable public edit link for student to edit and resubmit"
+            >
+              {copiedEditLink ? (
+                <>
+                  <Check size={15} />
+                  <span>Link Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Link2 size={15} />
+                  <span>Copy Student Edit Link</span>
+                </>
+              )}
+            </button>
           )}
 
           <button
@@ -557,11 +665,42 @@ function EditStudentCvContent() {
                 ({furigana})
               </span>
             </div>
-            <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-              Intake Source:{' '}
-              <strong style={{ color: 'var(--nikkou-navy)' }}>
-                {studentSource === 'public_form' ? 'Public Form' : 'Direct Admin Entry'}
-              </strong>
+            <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span>
+                Intake Source:{' '}
+                <strong style={{ color: 'var(--nikkou-navy)' }}>
+                  {studentSource === 'public_form' ? 'Public Form' : 'Direct Admin Entry'}
+                </strong>
+              </span>
+              <span>•</span>
+              <span>Student Form Link:</span>
+              {status === 'verified' ? (
+                <span style={{ color: '#047857', fontWeight: 700, fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <Lock size={12} /> Locked (Verified)
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleCopyStudentEditLink}
+                  disabled={!editToken}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: '#0284c7',
+                    fontWeight: 700,
+                    fontSize: '12.5px',
+                    cursor: 'pointer',
+                    padding: 0,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    textDecoration: 'underline',
+                  }}
+                  title="Copy student public edit link"
+                >
+                  {copiedEditLink ? '✓ Link Copied!' : 'Copy Student Edit Link'}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -588,9 +727,7 @@ function EditStudentCvContent() {
           >
             <option value="draft">Draft</option>
             <option value="submitted">Submitted</option>
-            <option value="under_review">Under Review</option>
             <option value="verified">Verified</option>
-            <option value="approved">Approved</option>
             <option value="inactive">Inactive</option>
           </select>
         </div>
@@ -959,6 +1096,9 @@ function EditStudentCvContent() {
                   <option value="">選択してください / নির্বাচন করুন</option>
                   <option value="独身 / অবিবাহিত">独身 / অবিবাহিত (Single)</option>
                   <option value="既婚 / বিবাহিত">既婚 / বিবাহিত (Married)</option>
+                  {maritalStatus && !['独身 / অবিবাহিত', '既婚 / বিবাহিত'].includes(maritalStatus) && (
+                    <option value={maritalStatus}>{maritalStatus}</option>
+                  )}
                 </select>
               </div>
 
@@ -1034,7 +1174,10 @@ function EditStudentCvContent() {
                   type="text"
                   value={age}
                   onChange={(e) => setAge(e.target.value)}
-                  placeholder="24歳 / ২৪ বছর"
+                  onBlur={() => {
+                    if (age || dob) setAge(normalizeCandidateAge(age, dob));
+                  }}
+                  placeholder="自動計算 (例: 19歳 / 19 বছর)"
                   style={{
                     width: '100%',
                     padding: '10px 14px',
@@ -1180,18 +1323,7 @@ function EditStudentCvContent() {
               }}
             >
               {/* Eyesight */}
-              <div>
-                <label style={{ display: 'block', fontSize: '13.5px', fontWeight: 700, color: 'var(--nikkou-navy)', marginBottom: '8px' }}>
-                  視力 / দৃষ্টিশক্তি
-                </label>
-                <input
-                  type="text"
-                  value={eyesight}
-                  onChange={(e) => setEyesight(e.target.value)}
-                  placeholder="右1.2 - 左1.2"
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid var(--border-light)', fontSize: '14px', fontWeight: 600 }}
-                />
-              </div>
+              <EyesightField value={eyesight} onChange={setEyesight} />
 
               {/* Color Blindness */}
               <div>
@@ -1422,57 +1554,65 @@ function EditStudentCvContent() {
 
               {/* Hobbies (Span full width) */}
               <div style={{ gridColumn: '1 / -1' }}>
-                <label style={{ display: 'block', fontSize: '13.5px', fontWeight: 700, color: 'var(--nikkou-navy)', marginBottom: '8px' }}>
-                  趣味 / শখ
-                </label>
-                <input
-                  type="text"
+                <TranslatableTextarea
+                  labelJp="趣味"
+                  labelBn="শখ"
                   value={hobbies}
-                  onChange={(e) => setHobbies(e.target.value)}
-                  placeholder="サッカーをすること、日本語の勉強 / ফুটবল খেলা এবং জাপানি ভাষা অধ্যয়ন"
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid var(--border-light)', fontSize: '14px', fontWeight: 600 }}
+                  onChange={setHobbies}
+                  originalBn={hobbiesOriginalBn}
+                  onChangeOriginalBn={setHobbiesOriginalBn}
+                  fieldType="hobbies"
+                  placeholder="আমি ফুটবল খেলতে পছন্দ করি"
+                  rows={2}
+                  aiEnabled={aiEnabled}
                 />
               </div>
 
               {/* Personality (Span full width) */}
               <div style={{ gridColumn: '1 / -1' }}>
-                <label style={{ display: 'block', fontSize: '13.5px', fontWeight: 700, color: 'var(--nikkou-navy)', marginBottom: '8px' }}>
-                  性格 / ব্যক্তিত্ব
-                </label>
-                <input
-                  type="text"
+                <TranslatableTextarea
+                  labelJp="性格"
+                  labelBn="নিজের ব্যক্তিত্ব"
                   value={personality}
-                  onChange={(e) => setPersonality(e.target.value)}
-                  placeholder="真面目で責任感があり、協調性があります / দায়িত্বশীল, পরিশ্রমী এবং দলগত কাজে মনোযোগী"
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid var(--border-light)', fontSize: '14px', fontWeight: 600 }}
+                  onChange={setPersonality}
+                  originalBn={personalityOriginalBn}
+                  onChangeOriginalBn={setPersonalityOriginalBn}
+                  fieldType="personality"
+                  placeholder="পরিশ্রমী এবং বন্ধুত্বপূর্ণ ব্যক্তিত্ব"
+                  rows={2}
+                  aiEnabled={aiEnabled}
                 />
               </div>
 
               {/* Motivation (Span full width) */}
               <div style={{ gridColumn: '1 / -1' }}>
-                <label style={{ display: 'block', fontSize: '13.5px', fontWeight: 700, color: 'var(--nikkou-navy)', marginBottom: '8px' }}>
-                  志望動機 / অনুপ্রেরণা (কেন জাপান যেতে চান)
-                </label>
-                <textarea
-                  rows={3}
+                <TranslatableTextarea
+                  labelJp="志望動機"
+                  labelBn="আবেদন করার অনুপ্রেরণা"
                   value={motivation}
-                  onChange={(e) => setMotivation(e.target.value)}
-                  placeholder="日本の先進的な技術と高い労働倫理を学び、将来のキャリアを発展させたいと考えております。 / জাপানের উন্নত প্রযুক্তি ও কাজের নীতি শিখে নিজের ক্যারিয়ার উন্নত করতে চাই।"
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid var(--border-light)', fontSize: '14px', fontWeight: 600, resize: 'vertical' }}
+                  onChange={setMotivation}
+                  originalBn={motivationOriginalBn}
+                  onChangeOriginalBn={setMotivationOriginalBn}
+                  fieldType="motivation"
+                  placeholder="জাপানের কর্মক্ষেত্রে টিমওয়ার্কের গুরুত্ব শিখতে চাই।"
+                  rows={3}
+                  aiEnabled={aiEnabled}
                 />
               </div>
 
               {/* Future Plan (Span full width) */}
               <div style={{ gridColumn: '1 / -1' }}>
-                <label style={{ display: 'block', fontSize: '13.5px', fontWeight: 700, color: 'var(--nikkou-navy)', marginBottom: '8px' }}>
-                  帰国後の計画 / ভবিষ্যৎ পরিকল্পনা
-                </label>
-                <textarea
-                  rows={3}
+                <TranslatableTextarea
+                  labelJp="将来の目標"
+                  labelBn="ভবিষ্যতের লক্ষ্য"
                   value={futurePlanAfterJapan}
-                  onChange={(e) => setFuturePlanAfterJapan(e.target.value)}
-                  placeholder="日本で培った技術とマネジメント経験を活かし、バングラデシュで技術指導や独立起業を目指します。 / জাপানে অর্জিত কারিগরি দক্ষতা ও কাজের অভিজ্ঞতা দিয়ে দেশে এসে ব্যবসা ও নেতৃত্ব দিতে চাই।"
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid var(--border-light)', fontSize: '14px', fontWeight: 600, resize: 'vertical' }}
+                  onChange={setFuturePlanAfterJapan}
+                  originalBn={futurePlanOriginalBn}
+                  onChangeOriginalBn={setFuturePlanOriginalBn}
+                  fieldType="future_plan"
+                  placeholder="আমি জাপানে কনস্ট্রাকশনের কাজ ভালোভাবে শিখে প্রযুক্তিগত দক্ষতা ও অভিজ্ঞতা অর্জন করতে চাই। এরপর ভবিষ্যতে দেশে ফিরে নিজের একটি কনস্ট্রাকশন কোম্পানি করতে চাই।"
+                  rows={4}
+                  aiEnabled={aiEnabled}
                 />
               </div>
             </div>
@@ -1601,7 +1741,7 @@ function EditStudentCvContent() {
               marginBottom: '28px',
             }}
           >
-            <WorkHistorySection entries={workHistory} onChange={setWorkHistory} />
+            <WorkHistorySection entries={workHistory} onChange={setWorkHistory} aiEnabled={aiEnabled} />
           </div>
 
           {/* SECTION 6: 家族 / পরিবার */}
@@ -1664,7 +1804,7 @@ function EditStudentCvContent() {
                     margin: 0,
                   }}
                 >
-                  評価 / মূল্যায়ন
+                  評価 / মূল্যায়ন (For Teachers)
                 </h2>
               </div>
 

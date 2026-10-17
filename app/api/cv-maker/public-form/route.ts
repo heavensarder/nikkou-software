@@ -44,15 +44,28 @@ export async function POST(request: NextRequest) {
       if (mergedDetails.language_english.includes('少し出来る')) mergedDetails.language_english = '少し可 / কিছুটা পারি';
     }
 
-    // Check if updating an existing draft
+    // Check if updating an existing draft or application
     const existingDraftCode = body.student_code;
     if (existingDraftCode) {
       const existing = await query<any[]>(
-        'SELECT id FROM student_cvs WHERE student_code = ? LIMIT 1',
+        'SELECT id, status, edit_token FROM student_cvs WHERE student_code = ? LIMIT 1',
         [existingDraftCode]
       );
       if (existing.length > 0) {
+        if (existing[0].status === 'verified') {
+          return NextResponse.json(
+            {
+              success: false,
+              locked: true,
+              message: 'This application has been verified and can no longer be edited.',
+            },
+            { status: 403 }
+          );
+        }
+
         const studentId = existing[0].id;
+        const currentEditToken = existing[0].edit_token || crypto.randomUUID();
+
         await query(
           `UPDATE student_cvs SET
             full_name = ?,
@@ -67,6 +80,7 @@ export async function POST(request: NextRequest) {
             program = ?,
             sub_program = ?,
             status = ?,
+            edit_token = ?,
             details_json = ?
           WHERE id = ?`,
           [
@@ -82,6 +96,7 @@ export async function POST(request: NextRequest) {
             finalProgram,
             finalSubProgram,
             isDraft ? 'draft' : 'submitted',
+            currentEditToken,
             JSON.stringify(mergedDetails),
             studentId,
           ]
@@ -94,21 +109,24 @@ export async function POST(request: NextRequest) {
             ? 'Draft updated successfully in the database!'
             : 'Your CV information has been submitted successfully!',
           student_code: existingDraftCode,
+          edit_token: currentEditToken,
         });
       }
     }
 
     const tempCode = `TMP-${Date.now()}`;
+    const newEditToken = crypto.randomUUID();
 
     const insertResult = await query<ResultSetHeader>(
       `INSERT INTO student_cvs (
-        form_id, student_code, source, full_name, email, phone, gender,
+        form_id, student_code, edit_token, source, full_name, email, phone, gender,
         date_of_birth, passport_number, jlpt_level, japanese_study_hours,
         target_intake, program, sub_program, status, details_json
-      ) VALUES (?, ?, 'public_form', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, 'public_form', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         null,
         tempCode,
+        newEditToken,
         finalFullName,
         email?.trim() || null,
         finalPhone,
@@ -140,6 +158,7 @@ export async function POST(request: NextRequest) {
         ? 'Draft saved successfully in the database! Reference code: ' + studentCode
         : 'Your CV information has been submitted successfully!',
       student_code: studentCode,
+      edit_token: newEditToken,
     });
   } catch (error: any) {
     console.error('Error submitting student CV:', error);

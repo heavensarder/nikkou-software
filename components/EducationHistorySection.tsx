@@ -30,6 +30,10 @@ export function parseJapaneseYearMonthToInput(val: string): string {
   if (match) {
     return `${match[1]}-${match[2].padStart(2, '0')}`;
   }
+  const ymMatch = val.match(/^(\d{4})[-/.](\d{1,2})/);
+  if (ymMatch) {
+    return `${ymMatch[1]}-${ymMatch[2].padStart(2, '0')}`;
+  }
   return '';
 }
 

@@ -27,6 +27,7 @@ export interface WorkExperienceEntry {
   end_year_month: string;
   company_name: string;
   job_description: string;
+  job_description_original_bn?: string;
 }
 
 export interface FamilyMemberEntry {
@@ -41,6 +42,7 @@ export interface StudentCv {
   id: number;
   form_id: number | null;
   student_code: string;
+  edit_token?: string | null;
   source: 'public_form' | 'admin_entry';
   full_name: string;
   email: string | null;
@@ -54,7 +56,7 @@ export interface StudentCv {
   target_intake: string | null;
   program?: string | null;
   sub_program?: string | null;
-  status: 'draft' | 'submitted' | 'under_review' | 'verified' | 'approved' | 'inactive';
+  status: 'draft' | 'submitted' | 'verified' | 'inactive';
   details_json: {
     program?: string | null;
     sub_program?: string | null;
@@ -78,7 +80,9 @@ export interface StudentCv {
     smoking?: string;
     alcohol?: string;
     hobbies?: string;
+    hobbies_original_bn?: string;
     personality?: string;
+    personality_original_bn?: string;
     cooking?: string;
     group_living?: string;
     blood_type?: string;
@@ -86,7 +90,9 @@ export interface StudentCv {
     personal_income?: string;
     target_savings_5years?: string;
     motivation?: string;
+    motivation_original_bn?: string;
     future_plan_after_japan?: string;
+    future_plan_original_bn?: string;
     japan_visa_applied_before?: string;
     japan_visa_type_applied?: string;
     // Section 3: 学歴 / শিক্ষাগত যোগ্যতা
@@ -106,4 +112,74 @@ export interface StudentCv {
   };
   created_at: string;
   updated_at: string;
+}
+
+export const EYE_POWER_OPTIONS = [
+  '2.0',
+  '1.5',
+  '1.2',
+  '1.0',
+  '0.9',
+  '0.8',
+  '0.7',
+  '0.6',
+  '0.5',
+  '0.4',
+  '0.3',
+  '0.2',
+  '0.1',
+] as const;
+
+export type EyePowerOption = (typeof EYE_POWER_OPTIONS)[number];
+
+export const EYESIGHT_OPTIONS = [
+  '右: 2.0 左: 2.0',
+  '右: 1.5 左: 1.5',
+  '右: 1.2 左: 1.2',
+  '右: 1.0 左: 1.0',
+  '右: 0.9 左: 0.9',
+  '右: 0.8 左: 0.8',
+  '右: 0.7 左: 0.7',
+  '右: 0.6 左: 0.6',
+  '右: 0.5 左: 0.5',
+  '右: 0.4 左: 0.4',
+  '右: 0.3 左: 0.3',
+  '右: 0.2 左: 0.2',
+  '右: 0.1 左: 0.1',
+] as const;
+
+export type EyesightOption = (typeof EYESIGHT_OPTIONS)[number];
+
+export function parseEyesight(val: string | null | undefined): { right: string; left: string } {
+  if (!val) return { right: '', left: '' };
+  // Strip any parenthetical annotations like "(Normal Vision)"
+  const str = String(val).replace(/\s*\([^)]*\)/g, '').trim();
+  if (!str) return { right: '', left: '' };
+
+  const matchJp = str.match(/右[:：]?\s*([+\-]?\d+(?:\.\d+)?)\s*左[:：]?\s*([+\-]?\d+(?:\.\d+)?)/);
+  if (matchJp) {
+    return { right: matchJp[1], left: matchJp[2] };
+  }
+
+  const matchOld = str.match(/右\s*([+\-]?\d+(?:\.\d+)?)\s*[-/]\s*左\s*([+\-]?\d+(?:\.\d+)?)/);
+  if (matchOld) {
+    return { right: matchOld[1], left: matchOld[2] };
+  }
+
+  const matchNums = str.match(/([+\-]?\d+(?:\.\d+)?)\s*[,/|\s-]\s*([+\-]?\d+(?:\.\d+)?)/);
+  if (matchNums) {
+    return { right: matchNums[1], left: matchNums[2] };
+  }
+
+  return { right: str, left: str };
+}
+
+export function formatEyesight(right: string, left: string): string {
+  // Strip any parenthetical annotations like "(Normal Vision)"
+  const r = (right || '').replace(/\s*\([^)]*\)/g, '').trim();
+  const l = (left || '').replace(/\s*\([^)]*\)/g, '').trim();
+  if (!r && !l) return '';
+  if (r && !l) return `右: ${r} 左: ${r}`;
+  if (!r && l) return `右: ${l} 左: ${l}`;
+  return `右: ${r} 左: ${l}`;
 }

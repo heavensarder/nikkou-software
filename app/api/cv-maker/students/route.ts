@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { COOKIE_NAME, verifySessionToken } from '@/lib/auth';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import crypto from 'crypto';
 
 function generateStudentCode(id: number): string {
   const year = new Date().getFullYear();
@@ -255,16 +256,18 @@ export async function POST(request: NextRequest) {
 
     // Temporary placeholder student_code that will be updated with actual insertId
     const tempCode = `TMP-${Date.now()}`;
+    const newEditToken = crypto.randomUUID();
 
     const insertResult = await query<ResultSetHeader>(
       `INSERT INTO student_cvs (
-        form_id, student_code, source, full_name, email, phone, gender,
+        form_id, student_code, edit_token, source, full_name, email, phone, gender,
         date_of_birth, passport_number, jlpt_level, japanese_study_hours,
         target_intake, program, sub_program, status, details_json
-      ) VALUES (?, ?, 'admin_entry', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, 'admin_entry', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         null,
         tempCode,
+        newEditToken,
         finalFullName,
         email?.trim() || null,
         finalPhone,
@@ -293,6 +296,7 @@ export async function POST(request: NextRequest) {
       student: {
         id: insertResult.insertId,
         student_code: actualCode,
+        edit_token: newEditToken,
         full_name: finalFullName,
       },
     });

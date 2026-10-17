@@ -7,7 +7,7 @@ import ProgramCategorySection from '@/components/ProgramCategorySection';
 import EducationHistorySection, { INITIAL_EDUCATION_ROWS } from '@/components/EducationHistorySection';
 import WorkHistorySection, { INITIAL_WORK_ROWS } from '@/components/WorkHistorySection';
 import FamilyInfoSection, { INITIAL_FAMILY_ROWS } from '@/components/FamilyInfoSection';
-import { EducationEntry, WorkExperienceEntry, FamilyMemberEntry } from '@/types/cv';
+import { EducationEntry, WorkExperienceEntry, FamilyMemberEntry, EYESIGHT_OPTIONS } from '@/types/cv';
 import {
   Send,
   CheckCircle2,
@@ -23,6 +23,8 @@ import {
   RotateCcw,
   Check,
 } from 'lucide-react';
+import EyesightField from '@/components/EyesightField';
+import TranslatableTextarea from '@/components/TranslatableTextarea';
 import AiDocumentFillModal from '@/components/AiDocumentFillModal';
 import {
   normalizeGender,
@@ -39,6 +41,7 @@ import {
   normalizeOccupation,
   normalizeFamilyAge,
   normalizeCandidateAge,
+  calculateAgeFromDob,
   normalizeCandidateDob,
   normalizeJapaneseYearMonth,
 } from '@/lib/cv-normalizer';
@@ -78,7 +81,9 @@ export default function FixedStudentCvForm() {
   const [smoking, setSmoking] = useState('');
   const [alcohol, setAlcohol] = useState('');
   const [hobbies, setHobbies] = useState('');
+  const [hobbiesOriginalBn, setHobbiesOriginalBn] = useState('');
   const [personality, setPersonality] = useState('');
+  const [personalityOriginalBn, setPersonalityOriginalBn] = useState('');
   const [cooking, setCooking] = useState('');
   const [groupLiving, setGroupLiving] = useState('');
   const [bloodType, setBloodType] = useState('');
@@ -86,7 +91,9 @@ export default function FixedStudentCvForm() {
   const [personalIncome, setPersonalIncome] = useState('');
   const [targetSavings5Years, setTargetSavings5Years] = useState('');
   const [motivation, setMotivation] = useState('');
+  const [motivationOriginalBn, setMotivationOriginalBn] = useState('');
   const [futurePlanAfterJapan, setFuturePlanAfterJapan] = useState('');
+  const [futurePlanOriginalBn, setFuturePlanOriginalBn] = useState('');
   const [japanVisaAppliedBefore, setJapanVisaAppliedBefore] = useState('');
   const [japanVisaTypeApplied, setJapanVisaTypeApplied] = useState('');
 
@@ -121,25 +128,10 @@ export default function FixedStudentCvForm() {
   const [draftSaveSuccess, setDraftSaveSuccess] = useState<string | null>(null);
   const isLoadedFromStorageRef = useRef(false);
 
-  // AI Document Auto-Fill Integration States
-  const [aiEnabled, setAiEnabled] = useState(false);
+  // Public form: AI features and translation buttons are strictly hidden (admin only)
+  const aiEnabled = false;
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [aiSuccessToast, setAiSuccessToast] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function checkAiStatus() {
-      try {
-        const res = await fetch('/api/settings/ai');
-        if (res.ok) {
-          const data = await res.json();
-          setAiEnabled(Boolean(data.enabled));
-        }
-      } catch (err) {
-        console.error('Failed to load AI settings status', err);
-      }
-    }
-    checkAiStatus();
-  }, []);
 
   // Handler to populate form state when AI finishes document parsing
   const handleDataExtractedFromAi = (data: any, count: number) => {
@@ -179,7 +171,9 @@ export default function FixedStudentCvForm() {
     }
     if (data.blood_type) setBloodType(normalizeBloodType(data.blood_type));
     if (data.hobbies) setHobbies(data.hobbies);
+    if (data.hobbies_original_bn) setHobbiesOriginalBn(data.hobbies_original_bn);
     if (data.personality) setPersonality(data.personality);
+    if (data.personality_original_bn) setPersonalityOriginalBn(data.personality_original_bn);
     if (data.cooking !== undefined && data.cooking !== null && data.cooking !== '') {
       setCooking(normalizeYesNo(data.cooking, true));
     }
@@ -192,7 +186,9 @@ export default function FixedStudentCvForm() {
     if (data.personal_income) setPersonalIncome(data.personal_income);
     if (data.target_savings_5years) setTargetSavings5Years(data.target_savings_5years);
     if (data.motivation) setMotivation(data.motivation);
+    if (data.motivation_original_bn) setMotivationOriginalBn(data.motivation_original_bn);
     if (data.future_plan_after_japan) setFuturePlanAfterJapan(data.future_plan_after_japan);
+    if (data.future_plan_original_bn) setFuturePlanOriginalBn(data.future_plan_original_bn);
     if (data.japan_visa_applied_before !== undefined && data.japan_visa_applied_before !== null && data.japan_visa_applied_before !== '') {
       setJapanVisaAppliedBefore(normalizeYesNo(data.japan_visa_applied_before, true));
     }
@@ -299,7 +295,9 @@ export default function FixedStudentCvForm() {
           if (data.smoking !== undefined) setSmoking(data.smoking);
           if (data.alcohol !== undefined) setAlcohol(data.alcohol);
           if (data.hobbies !== undefined) setHobbies(data.hobbies);
+          if (data.hobbiesOriginalBn !== undefined) setHobbiesOriginalBn(data.hobbiesOriginalBn);
           if (data.personality !== undefined) setPersonality(data.personality);
+          if (data.personalityOriginalBn !== undefined) setPersonalityOriginalBn(data.personalityOriginalBn);
           if (data.cooking !== undefined) setCooking(data.cooking);
           if (data.groupLiving !== undefined) setGroupLiving(data.groupLiving);
           if (data.bloodType !== undefined) setBloodType(data.bloodType);
@@ -307,7 +305,9 @@ export default function FixedStudentCvForm() {
           if (data.personalIncome !== undefined) setPersonalIncome(data.personalIncome);
           if (data.targetSavings5Years !== undefined) setTargetSavings5Years(data.targetSavings5Years);
           if (data.motivation !== undefined) setMotivation(data.motivation);
+          if (data.motivationOriginalBn !== undefined) setMotivationOriginalBn(data.motivationOriginalBn);
           if (data.futurePlanAfterJapan !== undefined) setFuturePlanAfterJapan(data.futurePlanAfterJapan);
+          if (data.futurePlanOriginalBn !== undefined) setFuturePlanOriginalBn(data.futurePlanOriginalBn);
           if (data.japanVisaAppliedBefore !== undefined) setJapanVisaAppliedBefore(data.japanVisaAppliedBefore);
           if (data.japanVisaTypeApplied !== undefined) setJapanVisaTypeApplied(data.japanVisaTypeApplied);
 
@@ -395,7 +395,9 @@ export default function FixedStudentCvForm() {
       setSmoking('');
       setAlcohol('');
       setHobbies('');
+      setHobbiesOriginalBn('');
       setPersonality('');
+      setPersonalityOriginalBn('');
       setCooking('');
       setGroupLiving('');
       setBloodType('');
@@ -403,7 +405,9 @@ export default function FixedStudentCvForm() {
       setPersonalIncome('');
       setTargetSavings5Years('');
       setMotivation('');
+      setMotivationOriginalBn('');
       setFuturePlanAfterJapan('');
+      setFuturePlanOriginalBn('');
       setJapanVisaAppliedBefore('');
       setJapanVisaTypeApplied('');
       setEducationHistory(INITIAL_EDUCATION_ROWS);
@@ -449,7 +453,7 @@ export default function FixedStudentCvForm() {
             name_native: fullName.trim(),
             gender_label: gender,
             marital_status: maritalStatus,
-            age_display: age.trim(),
+            age_display: normalizeCandidateAge(age, dob),
             dob_japanese: formatJapaneseBirthDate(dob),
             address: address.trim(),
             phone: phone.trim(),
@@ -462,7 +466,9 @@ export default function FixedStudentCvForm() {
             smoking: smoking,
             alcohol: alcohol,
             hobbies: hobbies.trim(),
+            hobbies_original_bn: hobbiesOriginalBn.trim(),
             personality: personality.trim(),
+            personality_original_bn: personalityOriginalBn.trim(),
             cooking: cooking,
             group_living: groupLiving,
             blood_type: bloodType,
@@ -470,7 +476,9 @@ export default function FixedStudentCvForm() {
             personal_income: personalIncome.trim(),
             target_savings_5years: targetSavings5Years.trim(),
             motivation: motivation.trim(),
+            motivation_original_bn: motivationOriginalBn.trim(),
             future_plan_after_japan: futurePlanAfterJapan.trim(),
+            future_plan_original_bn: futurePlanOriginalBn.trim(),
             japan_visa_applied_before: japanVisaAppliedBefore,
             japan_visa_type_applied: japanVisaTypeApplied.trim(),
             education_history: educationHistory.filter(
@@ -528,7 +536,9 @@ export default function FixedStudentCvForm() {
           smoking,
           alcohol,
           hobbies,
+          hobbiesOriginalBn,
           personality,
+          personalityOriginalBn,
           cooking,
           groupLiving,
           bloodType,
@@ -536,7 +546,9 @@ export default function FixedStudentCvForm() {
           personalIncome,
           targetSavings5Years,
           motivation,
+          motivationOriginalBn,
           futurePlanAfterJapan,
+          futurePlanOriginalBn,
           japanVisaAppliedBefore,
           japanVisaTypeApplied,
           educationHistory,
@@ -568,14 +580,8 @@ export default function FixedStudentCvForm() {
     setDob(selectedDate);
 
     if (selectedDate) {
-      const birthDate = new Date(selectedDate);
-      const today = new Date();
-      let calculatedAge = today.getFullYear() - birthDate.getFullYear();
-      const monthDiff = today.getMonth() - birthDate.getMonth();
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-        calculatedAge--;
-      }
-      if (calculatedAge >= 0) {
+      const calculatedAge = calculateAgeFromDob(selectedDate);
+      if (calculatedAge !== null) {
         setAge(`${calculatedAge}歳 / ${calculatedAge} বছর`);
       }
     } else {
@@ -604,11 +610,11 @@ export default function FixedStudentCvForm() {
     setGender('男性 / পুরুষ');
     setMaritalStatus('独身 / অবিবাহিত');
     setDob('2001-08-15');
-    setAge('25歳 / ২৫ বছর');
+    setAge('25歳 / 25 বছর');
     setAddress('VILL: PAIKPARA, P.O: JEWPARA, P.S: NATORE SADAR, NATORE');
     setPhone('+8801712-345678');
 
-    setEyesight('右1.2 - 左1.2');
+    setEyesight('右: 1.0 左: 1.0');
     setColorBlindness('無 / না');
     setDominantHand('右手 / ডান হাত');
     setBodyWeight('62kg');
@@ -729,7 +735,7 @@ export default function FixedStudentCvForm() {
             name_native: fullName.trim(),
             gender_label: gender,
             marital_status: maritalStatus,
-            age_display: age.trim(),
+            age_display: normalizeCandidateAge(age, dob),
             dob_japanese: formatJapaneseBirthDate(dob),
             address: address.trim(),
             phone: phone.trim(),
@@ -743,7 +749,9 @@ export default function FixedStudentCvForm() {
             smoking: smoking,
             alcohol: alcohol,
             hobbies: hobbies.trim(),
+            hobbies_original_bn: hobbiesOriginalBn.trim(),
             personality: personality.trim(),
+            personality_original_bn: personalityOriginalBn.trim(),
             cooking: cooking,
             group_living: groupLiving,
             blood_type: bloodType,
@@ -751,7 +759,9 @@ export default function FixedStudentCvForm() {
             personal_income: personalIncome.trim(),
             target_savings_5years: targetSavings5Years.trim(),
             motivation: motivation.trim(),
+            motivation_original_bn: motivationOriginalBn.trim(),
             future_plan_after_japan: futurePlanAfterJapan.trim(),
+            future_plan_original_bn: futurePlanOriginalBn.trim(),
             japan_visa_applied_before: japanVisaAppliedBefore,
             japan_visa_type_applied: japanVisaTypeApplied.trim(),
             // Section 3: 学歴 / শিক্ষাগত যোগ্যতা
@@ -969,79 +979,7 @@ export default function FixedStudentCvForm() {
               </div>
             )}
 
-            {/* Top Action & Status Bar */}
-            <div className={styles.topStatusBar}>
-              {lastSavedTime ? (
-                <div className={styles.cacheIndicator}>
-                  <span
-                    style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      background: '#22c55e',
-                      display: 'inline-block',
-                      boxShadow: '0 0 0 2px rgba(34,197,94,0.2)',
-                    }}
-                  />
-                  <span>
-                    খসড়া সংরক্ষিত: {lastSavedTime} / 下書き保存済み
-                  </span>
-                </div>
-              ) : <div />}
 
-              {/* Action Buttons */}
-              <div className={styles.topButtonGroup}>
-                <button
-                  type="button"
-                  onClick={handleSaveAsDraft}
-                  disabled={savingDraft || submitting}
-                  className={styles.secondaryActionBtn}
-                  title="বর্তমান খসড়া সংরক্ষণ করুন"
-                >
-                  <Save size={15} color="#1f3864" />
-                  <span>{savingDraft ? 'সংরক্ষণ হচ্ছে...' : 'Save as Draft / খসড়া সংরক্ষণ'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleFillDemoData}
-                  disabled={submitting}
-                  className={styles.secondaryActionBtn}
-                  title="ডেমো তথ্য পূরণ করুন"
-                >
-                  <Sparkles size={15} color="#e62b2b" />
-                  <span>デモ自動入力 / ডেমো পূরণ</span>
-                </button>
-
-                {/* AI Document Auto-Fill Button (Visible when AI toggle is ON) */}
-                {aiEnabled && (
-                  <button
-                    type="button"
-                    onClick={() => setAiModalOpen(true)}
-                    disabled={submitting}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '7px',
-                      padding: '8px 16px',
-                      borderRadius: '8px',
-                      border: '1.5px solid #2563eb',
-                      background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-                      color: '#ffffff',
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      boxShadow: '0 4px 12px rgba(37, 99, 235, 0.28)',
-                      transition: 'all 0.2s ease',
-                    }}
-                    title="Upload document to auto-fill form using AI"
-                  >
-                    <Sparkles size={15} />
-                    <span>Fill data with document / ডকুমেন্ট থেকে পূরণ</span>
-                  </button>
-                )}
-              </div>
-            </div>
             {errorMsg && (
               <div
                 style={{
@@ -1204,7 +1142,10 @@ export default function FixedStudentCvForm() {
                     type="text"
                     value={age}
                     onChange={(e) => setAge(e.target.value)}
-                    placeholder="自動計算 (例: 24歳 / ২৪ বছর)"
+                    onBlur={() => {
+                      if (age || dob) setAge(normalizeCandidateAge(age, dob));
+                    }}
+                    placeholder="自動計算 (例: 19歳 / 19 বছর)"
                     className={styles.formInput}
                   />
                 </div>
@@ -1250,18 +1191,12 @@ export default function FixedStudentCvForm() {
 
               {/* Grid 1: Eyesight, Color Blindness, Dominant Hand */}
               <div className={styles.grid3}>
-                <div className={styles.formField}>
-                  <label className={styles.formLabel}>
-                    視力 / দৃষ্টিশক্তি
-                  </label>
-                  <input
-                    type="text"
-                    value={eyesight}
-                    onChange={(e) => setEyesight(e.target.value)}
-                    placeholder="例: 右1.1 - 左1.1"
-                    className={styles.formInput}
-                  />
-                </div>
+                <EyesightField
+                  value={eyesight}
+                  onChange={setEyesight}
+                  className={styles.formField}
+                  selectClassName={styles.formSelect}
+                />
 
                 <div className={styles.formField}>
                   <label className={styles.formLabel}>
@@ -1402,31 +1337,30 @@ export default function FixedStudentCvForm() {
 
               {/* Grid 4: Hobby & Personality */}
               <div className={styles.grid2}>
-                <div className={styles.formField}>
-                  <label className={styles.formLabel}>
-                    趣味 / শখ:
-                  </label>
-                  <input
-                    type="text"
-                    value={hobbies}
-                    onChange={(e) => setHobbies(e.target.value)}
-                    placeholder="例: サッカーをするのが好きです / আমি ফুটবল খেলতে পছন্দ করি"
-                    className={styles.formInput}
-                  />
-                </div>
-
-                <div className={styles.formField}>
-                  <label className={styles.formLabel}>
-                    性格 / নিজের ব্যক্তিত্ব:
-                  </label>
-                  <input
-                    type="text"
-                    value={personality}
-                    onChange={(e) => setPersonality(e.target.value)}
-                    placeholder="例: 勤勉でフレンドリーな性格 / পরিশ্রমী এবং বন্ধুত্বপূর্ণ ব্যক্তিত্ব"
-                    className={styles.formInput}
-                  />
-                </div>
+                <TranslatableTextarea
+                  labelJp="趣味"
+                  labelBn="শখ"
+                  value={hobbies}
+                  onChange={setHobbies}
+                  originalBn={hobbiesOriginalBn}
+                  onChangeOriginalBn={setHobbiesOriginalBn}
+                  fieldType="hobbies"
+                  placeholder="আমি ফুটবল খেলতে পছন্দ করি"
+                  rows={2}
+                  aiEnabled={aiEnabled}
+                />
+                <TranslatableTextarea
+                  labelJp="性格"
+                  labelBn="নিজের ব্যক্তিত্ব"
+                  value={personality}
+                  onChange={setPersonality}
+                  originalBn={personalityOriginalBn}
+                  onChangeOriginalBn={setPersonalityOriginalBn}
+                  fieldType="personality"
+                  placeholder="পরিশ্রমী এবং বন্ধুত্বপূর্ণ ব্যক্তিত্ব"
+                  rows={2}
+                  aiEnabled={aiEnabled}
+                />
               </div>
 
               {/* Grid 5: Cooking, Group living, Medical history */}
@@ -1510,30 +1444,34 @@ export default function FixedStudentCvForm() {
               </div>
 
               {/* Motivation: Big Text Area */}
-              <div className={styles.formFieldFull}>
-                <label className={styles.formLabel}>
-                  志望動機 / আবেদন করার অনুপ্রেরণা
-                </label>
-                <textarea
-                  rows={3}
+              <div style={{ marginBottom: '18px' }}>
+                <TranslatableTextarea
+                  labelJp="志望動機"
+                  labelBn="আবেদন করার অনুপ্রেরণা"
                   value={motivation}
-                  onChange={(e) => setMotivation(e.target.value)}
-                  placeholder="例: 日本の職場でチームワークの大切さを学びたいです。 / জাপানের কর্মক্ষেত্রে টিমওয়ার্কের গুরুত্ব শিখতে চাই।"
-                  className={styles.formTextarea}
+                  onChange={setMotivation}
+                  originalBn={motivationOriginalBn}
+                  onChangeOriginalBn={setMotivationOriginalBn}
+                  fieldType="motivation"
+                  placeholder="জাপানের কর্মক্ষেত্রে টিমওয়ার্কের গুরুত্ব শিখতে চাই।"
+                  rows={3}
+                  aiEnabled={aiEnabled}
                 />
               </div>
 
               {/* Future Plan: Big Text Area */}
-              <div className={styles.formFieldFull}>
-                <label className={styles.formLabel}>
-                  将来の目標 / ভবিষ্যতের লক্ষ্য
-                </label>
-                <textarea
-                  rows={4}
+              <div style={{ marginBottom: '18px' }}>
+                <TranslatableTextarea
+                  labelJp="将来の目標"
+                  labelBn="ভবিষ্যতের লক্ষ্য"
                   value={futurePlanAfterJapan}
-                  onChange={(e) => setFuturePlanAfterJapan(e.target.value)}
-                  placeholder="例: 日本で建設の仕事をしっかり勉強して、技術と経験を身につけたいです。そして、将来、帰国して、自分の建設会社を作りたいです。 / আমি জাপানে কনস্ট্রাকশনের কাজ ভালোভাবে শিখে প্রযুক্তিগত দক্ষতা ও অভিজ্ঞতা অর্জন করতে চাই। এরপর ভবিষ্যতে দেশে ফিরে নিজের একটি কনস্ট্রাকশন কোম্পানি করতে চাই।"
-                  className={styles.formTextarea}
+                  onChange={setFuturePlanAfterJapan}
+                  originalBn={futurePlanOriginalBn}
+                  onChangeOriginalBn={setFuturePlanOriginalBn}
+                  fieldType="future_plan"
+                  placeholder="আমি জাপানে কনস্ট্রাকশনের কাজ ভালোভাবে শিখে প্রযুক্তিগত দক্ষতা ও অভিজ্ঞতা অর্জন করতে চাই। এরপর ভবিষ্যতে দেশে ফিরে নিজের একটি কনস্ট্রাকশন কোম্পানি করতে চাই।"
+                  rows={4}
+                  aiEnabled={aiEnabled}
                 />
               </div>
 
@@ -1680,6 +1618,7 @@ export default function FixedStudentCvForm() {
               entries={workHistory}
               onChange={setWorkHistory}
               disabled={submitting}
+              aiEnabled={aiEnabled}
             />
 
             {/* SECTION 6: 家族 / পরিবার */}
@@ -1726,7 +1665,7 @@ export default function FixedStudentCvForm() {
                       margin: 0,
                     }}
                   >
-                    評価 / মূল্যায়ন
+                    評価 / মূল্যায়ন (For Teachers)
                   </h2>
                 </div>
 
@@ -1759,22 +1698,13 @@ export default function FixedStudentCvForm() {
               </div>
             </div>
 
-            {/* Form Actions: Save as Draft & Submit */}
-            <div className={styles.bottomActionGroup}>
-              <button
-                type="button"
-                onClick={handleSaveAsDraft}
-                disabled={savingDraft || submitting}
-                className={styles.draftButton}
-              >
-                <Save size={18} color="var(--nikkou-navy)" />
-                {savingDraft ? 'সংরক্ষণ হচ্ছে... / 保存中...' : 'Save as Draft / খসড়া হিসেবে সংরক্ষণ'}
-              </button>
-
+            {/* Form Actions: Submit */}
+            <div className={styles.bottomActionGroup} style={{ justifyContent: 'center' }}>
               <button
                 type="submit"
-                disabled={submitting || savingDraft}
+                disabled={submitting}
                 className={styles.submitButton}
+                style={{ maxWidth: '420px', width: '100%' }}
               >
                 <Send size={18} />
                 {submitting ? '送信中... / জমা দেওয়া হচ্ছে...' : '送信する / চূড়ান্ত আবেদনপত্র জমা দিন'}

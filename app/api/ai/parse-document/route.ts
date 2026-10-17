@@ -203,7 +203,7 @@ TARGET JSON SCHEMA:
   "age": string | null,
   "address": string | null,
   "phone": string | null,
-  "eyesight": string | null,
+  "eyesight": "右: 1.0 左: 1.0" | "右: +0.25 左: +0.25" | "右: -0.5 左: -0.5" | string | null,
   "color_blindness": "無 / না" | "有 / হ্যাঁ" | null,
   "dominant_hand": "右手 / ডান হাত" | "左手 / বাম হাত" | "両手 / উভয় হাত" | null,
   "body_weight": string | null,
