@@ -25,6 +25,7 @@ import {
   Edit3,
   Link2,
   Lock,
+  RefreshCw,
 } from 'lucide-react';
 import { StudentCv } from '@/types/cv';
 import { PROGRAM_OPTIONS, getSubPrograms, formatProgramBadge } from '@/lib/programs';
@@ -69,9 +70,48 @@ export function formatFamilyMemberAge(val: string | null | undefined): string {
   return trimmed;
 }
 
+function playNotificationChime() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const now = ctx.currentTime;
+
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(587.33, now); // D5
+    gain1.gain.setValueAtTime(0.12, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.3);
+
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(880, now + 0.14); // A5
+    gain2.gain.setValueAtTime(0.12, now + 0.14);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.14);
+    osc2.stop(now + 0.45);
+  } catch {
+    // Silently ignore if blocked by browser autoplay policy
+  }
+}
+
 export default function StudentListPage() {
   const [students, setStudents] = useState<StudentCv[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [newlyArrivedIds, setNewlyArrivedIds] = useState<Set<number>>(new Set());
+  const [newStudentNotification, setNewStudentNotification] = useState<StudentCv | null>(null);
+  const isFirstLoadRef = useRef(true);
+  const knownStudentIdsRef = useRef<Set<number>>(new Set());
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedProgram, setSelectedProgram] = useState('');
@@ -306,10 +346,15 @@ export default function StudentListPage() {
     queryVal = searchQuery,
     statusVal = selectedStatus,
     progVal = selectedProgram,
-    subVal = selectedSubProgram
+    subVal = selectedSubProgram,
+    isSilent = false
   ) => {
     try {
-      setLoading(true);
+      if (!isSilent) {
+        setLoading(true);
+      } else {
+        setIsRefreshing(true);
+      }
       const params = new URLSearchParams();
       if (queryVal.trim()) params.set('q', queryVal.trim());
       if (statusVal) params.set('status', statusVal);
@@ -319,25 +364,89 @@ export default function StudentListPage() {
       const res = await fetch(`/api/cv-maker/students?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
-        if (data.success) {
-          setStudents(data.students);
+        if (data.success && Array.isArray(data.students)) {
+          const freshStudents: StudentCv[] = data.students;
+
+          // Check if new students arrived in real-time
+          if (!isFirstLoadRef.current && isSilent) {
+            const newlyAdded = freshStudents.filter(
+              (s) => !knownStudentIdsRef.current.has(s.id)
+            );
+            if (newlyAdded.length > 0) {
+              const newIds = new Set(newlyAdded.map((s) => s.id));
+              setNewlyArrivedIds((prev) => new Set([...prev, ...newIds]));
+              setNewStudentNotification(newlyAdded[0]);
+              playNotificationChime();
+
+              // Auto-clear highlight after 10s
+              setTimeout(() => {
+                setNewlyArrivedIds((prev) => {
+                  const updated = new Set(prev);
+                  newlyAdded.forEach((s) => updated.delete(s.id));
+                  return updated;
+                });
+              }, 10000);
+            }
+          }
+
+          knownStudentIdsRef.current = new Set(freshStudents.map((s) => s.id));
+          if (isFirstLoadRef.current) {
+            isFirstLoadRef.current = false;
+          }
+
+          setStudents(freshStudents);
+
+          // Keep activeStudent in preview drawer synced in realtime
+          if (activeStudent) {
+            const updatedActive = freshStudents.find((s) => s.id === activeStudent.id);
+            if (updatedActive && updatedActive.updated_at !== activeStudent.updated_at) {
+              setActiveStudent(updatedActive);
+            }
+          }
         }
       }
     } catch (err) {
       console.error('Failed to load students:', err);
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
   // Real-time search with debounce (250ms) and filter responsiveness
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetchStudents(searchQuery, selectedStatus, selectedProgram, selectedSubProgram);
+      fetchStudents(searchQuery, selectedStatus, selectedProgram, selectedSubProgram, false);
     }, 250);
 
     return () => clearTimeout(timer);
   }, [searchQuery, selectedStatus, selectedProgram, selectedSubProgram]);
+
+  // Real-time Background Auto-Polling (every 3 seconds when tab is active) & instant sync on window focus / online
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        fetchStudents(searchQuery, selectedStatus, selectedProgram, selectedSubProgram, true);
+      }
+    }, 3000);
+
+    const handleFocusSync = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        fetchStudents(searchQuery, selectedStatus, selectedProgram, selectedSubProgram, true);
+      }
+    };
+
+    window.addEventListener('focus', handleFocusSync);
+    window.addEventListener('online', handleFocusSync);
+    document.addEventListener('visibilitychange', handleFocusSync);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocusSync);
+      window.removeEventListener('online', handleFocusSync);
+      document.removeEventListener('visibilitychange', handleFocusSync);
+    };
+  }, [searchQuery, selectedStatus, selectedProgram, selectedSubProgram, activeStudent]);
 
   const handleProgramChange = (prog: string) => {
     setSelectedProgram(prog);
@@ -450,13 +559,57 @@ export default function StudentListPage() {
       {/* Top Banner */}
       <div className={styles.pageHeader} suppressHydrationWarning>
         <div className={styles.headerLeft} suppressHydrationWarning>
-          <h2>Student CV Intake List</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <h2>Student CV Intake List</h2>
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                backgroundColor: '#ecfdf5',
+                border: '1px solid #a7f3d0',
+                borderRadius: '20px',
+                padding: '4px 10px',
+                fontSize: '11.5px',
+                fontWeight: 700,
+                color: '#065f46',
+              }}
+              title="Realtime updates active — new applications update automatically without page refresh"
+            >
+              <span
+                style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  backgroundColor: '#10b981',
+                  display: 'inline-block',
+                  boxShadow: '0 0 0 0 rgba(16, 185, 129, 0.7)',
+                  animation: 'pulseLive 2s infinite',
+                }}
+              />
+              <span>Live Sync</span>
+              {isRefreshing && (
+                <RefreshCw size={11} className="animate-spin" style={{ color: '#059669', marginLeft: '2px' }} />
+              )}
+            </div>
+          </div>
           <p>
-            View and manage all student submissions received via shareable form links and direct admin intake.
+            View and manage all student submissions received via shareable form links and direct admin intake in real-time.
           </p>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }} suppressHydrationWarning>
+          <button
+            type="button"
+            onClick={() => fetchStudents(searchQuery, selectedStatus, selectedProgram, selectedSubProgram, true)}
+            className={styles.secondaryBtn}
+            style={{ padding: '10px 14px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            title="Refresh list now"
+          >
+            <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+            <span>Sync</span>
+          </button>
+
           <button
             type="button"
             onClick={handleCopyLink}
@@ -482,6 +635,97 @@ export default function StudentListPage() {
           </Link>
         </div>
       </div>
+
+      {/* Realtime New Student Notification Toast */}
+      {newStudentNotification && (
+        <div
+          style={{
+            marginBottom: '16px',
+            padding: '12px 18px',
+            backgroundColor: '#f0fdf4',
+            border: '1.5px solid #86efac',
+            borderRadius: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: '0 4px 14px rgba(22, 101, 52, 0.08)',
+            animation: 'slideDown 0.3s ease-out',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                backgroundColor: '#dcfce7',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '16px',
+              }}
+            >
+              ⚡
+            </div>
+            <div>
+              <div style={{ fontWeight: 800, color: '#14532d', fontSize: '13.5px' }}>
+                New Student Application Received Live!
+              </div>
+              <div style={{ color: '#166534', fontSize: '12.5px' }}>
+                <span style={{ fontWeight: 700 }}>
+                  {newStudentNotification.details_json?.name_native || newStudentNotification.full_name}
+                </span>{' '}
+                — Code:{' '}
+                <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>
+                  {newStudentNotification.student_code}
+                </span>{' '}
+                • {newStudentNotification.program || 'General Program'}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={() => {
+                handleOpenDrawer(newStudentNotification);
+                setNewStudentNotification(null);
+              }}
+              style={{
+                backgroundColor: '#16a34a',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '6px 14px',
+                fontSize: '12.5px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+              }}
+            >
+              <Eye size={14} /> View
+            </button>
+            <button
+              type="button"
+              onClick={() => setNewStudentNotification(null)}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#15803d',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+              title="Dismiss notification"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Table Card */}
       <div className={styles.card} suppressHydrationWarning>
@@ -664,6 +908,7 @@ export default function StudentListPage() {
                 </tr>
               ) : (
                 students.map((student) => {
+                  const isNewlyArrived = newlyArrivedIds.has(student.id);
                   const details = student.details_json || {};
                   const photoSrc = details.photo_data || null;
                   const furiganaVal = details.furigana || student.full_name;
@@ -675,7 +920,18 @@ export default function StudentListPage() {
                   const phoneVal = student.phone || details.phone || '—';
 
                   return (
-                    <tr key={student.id}>
+                    <tr
+                      key={student.id}
+                      style={
+                        isNewlyArrived
+                          ? {
+                              backgroundColor: '#f0fdf4',
+                              transition: 'background-color 1.5s ease',
+                              boxShadow: 'inset 4px 0 0 #10b981',
+                            }
+                          : undefined
+                      }
+                    >
                       {/* Photo Thumbnail */}
                       <td>
                         <div
@@ -705,7 +961,24 @@ export default function StudentListPage() {
 
                       {/* Student Code */}
                       <td>
-                        <span className={styles.codePill}>{student.student_code}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span className={styles.codePill}>{student.student_code}</span>
+                          {isNewlyArrived && (
+                            <span
+                              style={{
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                fontSize: '10px',
+                                fontWeight: 800,
+                                backgroundColor: '#10b981',
+                                color: '#ffffff',
+                                letterSpacing: '0.5px',
+                              }}
+                            >
+                              NEW
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Student Name / 氏名 */}
@@ -2870,6 +3143,29 @@ export default function StudentListPage() {
           </div>
         </div>
       )}
+      <style jsx>{`
+        @keyframes pulseLive {
+          0% {
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+          }
+          70% {
+            box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+          }
+          100% {
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+          }
+        }
+        @keyframes slideDown {
+          from {
+            opacity: 0;
+            transform: translateY(-8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
     </div>
   );
 }
