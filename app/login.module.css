@@ -1,0 +1,282 @@
+.loginContainer {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background-color: #f8fafc;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(230, 43, 43, 0.04) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(31, 56, 100, 0.06) 0px, transparent 50%),
+    linear-gradient(to right, rgba(226, 232, 240, 0.4) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(226, 232, 240, 0.4) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
+  padding: 24px 16px;
+  overflow: hidden;
+}
+
+/* Subtle decorative Japanese sun / torii backdrop halo */
+.ambientHalo {
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(230, 43, 43, 0.05) 0%, rgba(255, 255, 255, 0) 70%);
+  top: -150px;
+  right: -150px;
+  pointer-events: none;
+}
+
+.ambientHaloBottom {
+  position: absolute;
+  width: 500px;
+  height: 500px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(31, 56, 100, 0.05) 0%, rgba(255, 255, 255, 0) 70%);
+  bottom: -150px;
+  left: -150px;
+  pointer-events: none;
+}
+
+.loginCard {
+  width: 100%;
+  max-width: 460px;
+  background: #ffffff;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-light);
+  box-shadow: 
+    0 20px 40px -15px rgba(31, 56, 100, 0.1),
+    0 1px 3px 0 rgba(15, 23, 42, 0.05);
+  position: relative;
+  overflow: hidden;
+  z-index: 10;
+  animation: fadeIn 0.4s ease-out;
+}
+
+/* Red Torii Top Accent Bar */
+.cardTopBar {
+  height: 5px;
+  width: 100%;
+  background: linear-gradient(90deg, #e62b2b 0%, #ff5252 50%, #1f3864 100%);
+}
+
+.cardHeader {
+  padding: 36px 36px 20px 36px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.logoWrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 8px 16px;
+  background: #ffffff;
+  border-radius: var(--radius-md);
+  transition: transform 0.2s ease;
+}
+
+.logoWrapper:hover {
+  transform: scale(1.02);
+}
+
+.logoImg {
+  max-width: 260px;
+  height: auto;
+  object-fit: contain;
+}
+
+.badgeTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background-color: var(--nikkou-red-subtle);
+  border: 1px solid var(--nikkou-red-border);
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--nikkou-red);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--nikkou-navy);
+  letter-spacing: -0.3px;
+  margin-bottom: 4px;
+}
+
+.titleJp {
+  font-family: var(--font-jp);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.formWrapper {
+  padding: 0 36px 36px 36px;
+}
+
+.alertBox {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  line-height: 1.4;
+  margin-bottom: 20px;
+  animation: fadeIn 0.3s ease;
+}
+
+.alertError {
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+}
+
+.alertSuccess {
+  background-color: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #047857;
+}
+
+.formGroup {
+  margin-bottom: 18px;
+}
+
+.label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.inputWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.inputIcon {
+  position: absolute;
+  left: 14px;
+  color: var(--text-muted);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inputField {
+  width: 100%;
+  height: 44px;
+  padding: 0 42px 0 42px;
+  font-size: 14px;
+  color: var(--text-primary);
+  background-color: #ffffff;
+  border: 1.5px solid var(--border-light);
+  border-radius: var(--radius-md);
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.inputField:focus {
+  border-color: var(--nikkou-red);
+  box-shadow: 0 0 0 3.5px var(--nikkou-red-glow);
+}
+
+.inputField::placeholder {
+  color: var(--text-faint);
+  font-size: 13.5px;
+}
+
+.passwordToggle {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+}
+
+.passwordToggle:hover {
+  color: var(--text-primary);
+}
+
+.optionsRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22px;
+  font-size: 13px;
+}
+
+.rememberLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  user-select: none;
+}
+
+.checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--nikkou-red);
+  cursor: pointer;
+}
+
+.submitBtn {
+  width: 100%;
+  height: 46px;
+  background: linear-gradient(135deg, #e62b2b 0%, #d32020 100%);
+  color: #ffffff;
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 14px rgba(230, 43, 43, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.submitBtn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #d32020 0%, #b81616 100%);
+  box-shadow: 0 6px 20px rgba(230, 43, 43, 0.45);
+  transform: translateY(-1px);
+}
+
+.submitBtn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.submitBtn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.footerNote {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}

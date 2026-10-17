@@ -1,0 +1,2389 @@
+'use client';
+
+import React, { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
+import { useReactToPrint } from 'react-to-print';
+import {
+  Users,
+  Search,
+  Filter,
+  Eye,
+  Trash2,
+  Calendar,
+  Phone,
+  Mail,
+  BookOpen,
+  FileText,
+  X,
+  Plus,
+  CheckCircle2,
+  Clock,
+  UserCheck,
+  Copy,
+  Check,
+  Printer,
+  Edit3,
+} from 'lucide-react';
+import { StudentCv } from '@/types/cv';
+import { PROGRAM_OPTIONS, getSubPrograms, formatProgramBadge } from '@/lib/programs';
+import styles from '../cv-maker.module.css';
+import { formatJapaneseBirthDate, formatLanguageDisplay } from '@/lib/cv-normalizer';
+export { formatJapaneseBirthDate, formatLanguageDisplay };
+
+export function getJapaneseTodayDate(): { year: string; month: string; day: string } {
+  const d = new Date();
+  return {
+    year: String(d.getFullYear()),
+    month: String(d.getMonth() + 1).padStart(2, '0'),
+    day: String(d.getDate()).padStart(2, '0'),
+  };
+}
+
+export function formatFamilyMemberAge(val: string | null | undefined): string {
+  if (!val) return '—';
+  const trimmed = String(val).trim();
+  if (!trimmed) return '—';
+  if (trimmed.includes('歳') || trimmed.includes('বছর')) return trimmed;
+  const num = parseInt(trimmed, 10);
+  if (!isNaN(num) && num > 0 && num <= 120) {
+    const bnDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+    const bn = num
+      .toString()
+      .split('')
+      .map((d) => bnDigits[parseInt(d, 10)] ?? d)
+      .join('');
+    return `${num}歳 / ${bn} বছর`;
+  }
+  return trimmed;
+}
+
+export default function StudentListPage() {
+  const [students, setStudents] = useState<StudentCv[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('');
+  const [selectedProgram, setSelectedProgram] = useState('');
+  const [selectedSubProgram, setSelectedSubProgram] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  // Selected student for drawer preview
+  const [activeStudent, setActiveStudent] = useState<StudentCv | null>(null);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  // Target element ref for clean, pixel-perfect A4 printing
+  const cvPrintRef = useRef<HTMLDivElement>(null);
+
+  const handleReactToPrint = useReactToPrint({
+    contentRef: cvPrintRef,
+    documentTitle: activeStudent ? `CV_${activeStudent.student_code || activeStudent.full_name}` : 'Rirekisho_CV',
+    ignoreGlobalStyles: true,
+    pageStyle: `
+      @import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700;800;900&family=Noto+Sans+JP:wght@400;500;600;700;800;900&display=swap');
+
+      @page {
+        size: A4 portrait;
+        margin: 6mm 8mm;
+      }
+      *, *:before, *:after {
+        box-sizing: border-box !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+      }
+      table, tr, td, th, div, span, img {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+      }
+      @media print {
+        *, *:before, *:after {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          color-adjust: exact !important;
+        }
+        table, tr, td, th, div, span, img {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          color-adjust: exact !important;
+        }
+      }
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        font-family: 'Noto Sans JP', 'Noto Sans Bengali', 'Hind Siliguri', sans-serif !important;
+        -webkit-font-smoothing: antialiased;
+      }
+      .cv-printable-page {
+        width: 100% !important;
+        max-width: 192mm !important;
+        margin: 0 auto !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+        display: block !important;
+        overflow: visible !important;
+        border: none !important;
+        box-shadow: none !important;
+      }
+      /* Strict Unbreakable Rule: Never divide any section across pages */
+      .cv-section,
+      [data-cv-section] {
+        display: block !important;
+        position: static !important;
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+        -webkit-column-break-inside: avoid !important;
+        break-inside: avoid-page !important;
+        break-after: auto !important;
+        page-break-after: auto !important;
+        overflow: visible !important;
+        margin-bottom: 8px !important;
+      }
+      .cv-section > div {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+        -webkit-column-break-inside: avoid !important;
+        break-inside: avoid-page !important;
+        overflow: visible !important;
+      }
+      /* Tables and table rows cannot be cut in the middle */
+      table {
+        border-collapse: collapse !important;
+        width: 100% !important;
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+        -webkit-column-break-inside: avoid !important;
+        break-inside: avoid-page !important;
+      }
+      tbody, thead, tfoot {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+        -webkit-column-break-inside: avoid !important;
+        break-inside: avoid-page !important;
+      }
+      tr {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+        -webkit-column-break-inside: avoid !important;
+        break-inside: avoid-page !important;
+        break-after: auto !important;
+        page-break-after: auto !important;
+      }
+      td, th {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+        -webkit-column-break-inside: avoid !important;
+        break-inside: avoid-page !important;
+      }
+      /* Keep section titles glued to their section content */
+      .cv-section-title,
+      [data-cv-section-title] {
+        break-after: avoid !important;
+        page-break-after: avoid !important;
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+      }
+    `,
+    onPrintError: (location, err) => {
+      console.warn('react-to-print warning/error at', location, err);
+      window.print();
+    },
+  });
+
+  // Print Number (番号/no) prompt and preview state
+  const [printNumber, setPrintNumber] = useState<string>(''); // Empty by default in preview as requested
+  const [isAskingPrintNumber, setIsAskingPrintNumber] = useState<boolean>(false);
+  const [tempPrintNumber, setTempPrintNumber] = useState<string>('1');
+  const [printKeepEmpty, setPrintKeepEmpty] = useState<boolean>(false);
+
+  const handleInitiatePrint = () => {
+    setTempPrintNumber(printNumber || '1');
+    setPrintKeepEmpty(!printNumber);
+    setIsAskingPrintNumber(true);
+  };
+
+  const handleConfirmPrint = () => {
+    const finalNumber = printKeepEmpty ? '' : (tempPrintNumber.trim() || '1');
+    setPrintNumber(finalNumber);
+    setIsAskingPrintNumber(false);
+    setTimeout(() => {
+      try {
+        if (typeof handleReactToPrint === 'function') {
+          handleReactToPrint();
+        } else {
+          window.print();
+        }
+      } catch (err) {
+        console.error('Trigger print error:', err);
+        window.print();
+      }
+    }, 120);
+  };
+
+  const handleCopyLink = () => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const formUrl = `${origin}/cv-form`;
+    navigator.clipboard.writeText(formUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+  const fetchStudents = async (
+    queryVal = searchQuery,
+    statusVal = selectedStatus,
+    progVal = selectedProgram,
+    subVal = selectedSubProgram
+  ) => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams();
+      if (queryVal.trim()) params.set('q', queryVal.trim());
+      if (statusVal) params.set('status', statusVal);
+      if (progVal) params.set('program', progVal);
+      if (subVal) params.set('sub_program', subVal);
+
+      const res = await fetch(`/api/cv-maker/students?${params.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setStudents(data.students);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load students:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Real-time search with debounce (250ms) and filter responsiveness
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchStudents(searchQuery, selectedStatus, selectedProgram, selectedSubProgram);
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, selectedStatus, selectedProgram, selectedSubProgram]);
+
+  const handleProgramChange = (prog: string) => {
+    setSelectedProgram(prog);
+    if (prog) {
+      const validSubs = getSubPrograms(prog).map((s) => s.id);
+      if (selectedSubProgram && !validSubs.includes(selectedSubProgram)) {
+        setSelectedSubProgram('');
+      }
+    } else {
+      setSelectedSubProgram('');
+    }
+  };
+
+  const handleResetFilters = () => {
+    setSearchQuery('');
+    setSelectedStatus('');
+    setSelectedProgram('');
+    setSelectedSubProgram('');
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    fetchStudents(searchQuery, selectedStatus, selectedProgram, selectedSubProgram);
+  };
+
+  const handleOpenDrawer = async (student: StudentCv) => {
+    setPrintNumber(''); // explicitly empty on preview!
+    setTempPrintNumber('1');
+    setPrintKeepEmpty(false);
+    try {
+      const res = await fetch(`/api/cv-maker/students/${student.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setActiveStudent(data.student);
+          return;
+        }
+      }
+      setActiveStudent(student);
+    } catch {
+      setActiveStudent(student);
+    }
+  };
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (!activeStudent) return;
+    setUpdatingStatus(true);
+    try {
+      const res = await fetch(`/api/cv-maker/students/${activeStudent.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (res.ok) {
+        setActiveStudent((prev) => (prev ? { ...prev, status: newStatus as any } : null));
+        setStudents((prev) =>
+          prev.map((s) => (s.id === activeStudent.id ? { ...s, status: newStatus as any } : s))
+        );
+      }
+    } catch (err) {
+      console.error('Failed to update student status:', err);
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const handleDeleteStudent = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this student record?')) return;
+    try {
+      const res = await fetch(`/api/cv-maker/students/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setStudents((prev) => prev.filter((s) => s.id !== id));
+        if (activeStudent?.id === id) setActiveStudent(null);
+      }
+    } catch (err) {
+      console.error('Failed to delete student:', err);
+    }
+  };
+
+  const renderStatusBadge = (status: string) => {
+    switch (status) {
+      case 'draft':
+        return <span className={`${styles.badge} ${styles.badgeDraft}`}>Draft</span>;
+      case 'submitted':
+        return <span className={`${styles.badge} ${styles.badgeSubmitted}`}>Submitted</span>;
+      case 'under_review':
+        return <span className={`${styles.badge} ${styles.badgeUnderReview}`}>Under Review</span>;
+      case 'verified':
+        return <span className={`${styles.badge} ${styles.badgeVerified}`}>Verified</span>;
+      case 'approved':
+        return <span className={`${styles.badge} ${styles.badgeApproved}`}>Approved</span>;
+      default:
+        return <span className={`${styles.badge} ${styles.badgeActive}`}>{status}</span>;
+    }
+  };
+
+  return (
+    <div className={styles.pageContainer} suppressHydrationWarning>
+      {/* Top Banner */}
+      <div className={styles.pageHeader} suppressHydrationWarning>
+        <div className={styles.headerLeft} suppressHydrationWarning>
+          <h2>Student CV Intake List</h2>
+          <p>
+            View and manage all student submissions received via shareable form links and direct admin intake.
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }} suppressHydrationWarning>
+          <button
+            type="button"
+            onClick={handleCopyLink}
+            className={`${styles.secondaryBtn} ${copied ? styles.copyBtnSuccess : ''}`}
+            style={{ padding: '10px 16px' }}
+          >
+            {copied ? (
+              <>
+                <Check size={16} />
+                Link Copied!
+              </>
+            ) : (
+              <>
+                <Copy size={16} />
+                Copy Student Form Link
+              </>
+            )}
+          </button>
+
+          <Link href="/dashboard/cv-maker/new?fresh=true" className={styles.primaryBtn}>
+            <Plus size={16} />
+            Create New CV
+          </Link>
+        </div>
+      </div>
+
+      {/* Main Table Card */}
+      <div className={styles.card} suppressHydrationWarning>
+        {/* Toolbar: Search & Status Filters */}
+        <div className={styles.tableToolbar} suppressHydrationWarning>
+          <form onSubmit={handleSearchSubmit} className={styles.searchBox} style={{ position: 'relative' }}>
+            <Search size={16} className={styles.searchIcon} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by name, code, phone, address..."
+              className={styles.searchInput}
+              style={{ paddingRight: searchQuery ? '32px' : undefined }}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                style={{
+                  position: 'absolute',
+                  right: '10px',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '2px',
+                }}
+                title="Clear search"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </form>
+
+          <div className={styles.filterGroup} style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            {/* Filter by Program */}
+            <select
+              value={selectedProgram}
+              onChange={(e) => handleProgramChange(e.target.value)}
+              className={styles.filterSelect}
+              style={{ fontWeight: 600, minWidth: '150px' }}
+              title="Filter by Program"
+            >
+              <option value="">All Programs (সব প্রোগ্রাম)</option>
+              {PROGRAM_OPTIONS.map((prog) => (
+                <option key={prog.id} value={prog.id}>
+                  {prog.label}
+                </option>
+              ))}
+            </select>
+
+            {/* Filter by Sub-program / Category */}
+            <select
+              value={selectedSubProgram}
+              onChange={(e) => setSelectedSubProgram(e.target.value)}
+              className={styles.filterSelect}
+              style={{ fontWeight: 600, minWidth: '170px' }}
+              title="Filter by Category / Sub-program"
+            >
+              <option value="">
+                {selectedProgram ? `All ${selectedProgram} Categories` : 'All Categories (সব বিভাগ)'}
+              </option>
+              {selectedProgram ? (
+                getSubPrograms(selectedProgram).map((sub) => (
+                  <option key={sub.id} value={sub.id}>
+                    {sub.label}
+                  </option>
+                ))
+              ) : (
+                PROGRAM_OPTIONS.map((prog) => (
+                  <optgroup key={prog.id} label={`${prog.label} (${prog.labelBn})`}>
+                    {prog.subPrograms.map((sub) => (
+                      <option key={`${prog.id}-${sub.id}`} value={sub.id}>
+                        {sub.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))
+              )}
+            </select>
+
+            {/* Status Filter */}
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className={styles.filterSelect}
+              style={{ fontWeight: 600 }}
+              title="Filter by Status"
+            >
+              <option value="">All Statuses</option>
+              <option value="draft">Draft</option>
+              <option value="submitted">Submitted</option>
+              <option value="under_review">Under Review</option>
+              <option value="verified">Verified</option>
+              <option value="approved">Approved</option>
+            </select>
+
+            {/* Reset Filters button if any filter is active */}
+            {(selectedProgram || selectedSubProgram || selectedStatus || searchQuery) && (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className={styles.secondaryBtn}
+                style={{
+                  height: '38px',
+                  padding: '0 12px',
+                  fontSize: '12.5px',
+                  color: '#dc2626',
+                  borderColor: '#fca5a5',
+                  background: '#fef2f2',
+                }}
+                title="Reset all filters"
+              >
+                <X size={14} />
+                <span>Reset</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Table View */}
+        <div className={styles.tableResponsive}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th style={{ width: '56px' }}>Photo</th>
+                <th>Student Code</th>
+                <th>Name</th>
+                <th>Program / Category</th>
+                <th>Gender</th>
+                <th>DOB & Age</th>
+                <th>Status</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '40px' }}>
+                    Loading student records...
+                  </td>
+                </tr>
+              ) : students.length === 0 ? (
+                <tr>
+                  <td colSpan={8}>
+                    <div className={styles.emptyState}>
+                      <div className={styles.emptyIcon}>
+                        {searchQuery || selectedProgram || selectedSubProgram || selectedStatus ? (
+                          <Search size={24} />
+                        ) : (
+                          <Users size={24} />
+                        )}
+                      </div>
+                      <h3>
+                        {searchQuery || selectedProgram || selectedSubProgram || selectedStatus
+                          ? 'No matching student records found'
+                          : 'No student records found'}
+                      </h3>
+                      <p style={{ marginTop: '4px', fontSize: '13px' }}>
+                        {searchQuery || selectedProgram || selectedSubProgram || selectedStatus ? (
+                          <>
+                            No students match your active filters or search &ldquo;{searchQuery}&rdquo;.
+                            <br />
+                            <button
+                              type="button"
+                              onClick={handleResetFilters}
+                              className={styles.secondaryBtn}
+                              style={{ marginTop: '12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                            >
+                              <X size={14} /> Reset all filters
+                            </button>
+                          </>
+                        ) : (
+                          'Share your form link with students or click “Create New CV” to add a student manually.'
+                        )}
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                students.map((student) => {
+                  const details = student.details_json || {};
+                  const photoSrc = details.photo_data || null;
+                  const furiganaVal = details.furigana || student.full_name;
+                  const nameVal = details.name_native || '—';
+                  const genderVal = details.gender_label || (student.gender === 'female' ? '女性 / মহিলা' : '男性 / পুরুষ');
+                  const maritalVal = details.marital_status || '—';
+                  const ageVal = details.age_display || '—';
+                  const addressVal = details.address || '—';
+                  const phoneVal = student.phone || details.phone || '—';
+
+                  return (
+                    <tr key={student.id}>
+                      {/* Photo Thumbnail */}
+                      <td>
+                        <div
+                          style={{
+                            width: '36px',
+                            height: '46px',
+                            borderRadius: '4px',
+                            background: '#f1f5f9',
+                            border: '1px solid #cbd5e1',
+                            overflow: 'hidden',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          {photoSrc ? (
+                            <img
+                              src={photoSrc}
+                              alt={furiganaVal}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            />
+                          ) : (
+                            <Users size={18} color="#94a3b8" />
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Student Code */}
+                      <td>
+                        <span className={styles.codePill}>{student.student_code}</span>
+                      </td>
+
+                      {/* Student Name / 氏名 */}
+                      <td>
+                        <div style={{ fontWeight: 700, color: 'var(--nikkou-navy)', textTransform: 'uppercase', fontSize: '13.5px' }}>
+                          {nameVal !== '—' ? nameVal : furiganaVal}
+                        </div>
+                        {furiganaVal && furiganaVal !== nameVal && (
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            {furiganaVal}
+                          </div>
+                        )}
+                        <div style={{ fontSize: '10.5px', color: '#94a3b8', marginTop: '2px' }}>
+                          {student.source === 'public_form' ? 'Public Form' : 'Admin Entry'}
+                        </div>
+                      </td>
+
+                      {/* Program & Category */}
+                      <td>
+                        {student.program || details.program ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'flex-start' }}>
+                            <span
+                              style={{
+                                display: 'inline-block',
+                                fontSize: '11px',
+                                fontWeight: 800,
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                letterSpacing: '0.3px',
+                                background:
+                                  (student.program || details.program) === 'TITP/ESD'
+                                    ? '#eff6ff'
+                                    : (student.program || details.program) === 'SSW'
+                                      ? '#ecfdf5'
+                                      : '#fffbeb',
+                                color:
+                                  (student.program || details.program) === 'TITP/ESD'
+                                    ? '#1d4ed8'
+                                    : (student.program || details.program) === 'SSW'
+                                      ? '#047857'
+                                      : '#b45309',
+                                border: `1px solid ${(student.program || details.program) === 'TITP/ESD'
+                                  ? '#bfdbfe'
+                                  : (student.program || details.program) === 'SSW'
+                                    ? '#a7f3d0'
+                                    : '#fde68a'
+                                  }`,
+                              }}
+                            >
+                              {student.program || details.program}
+                            </span>
+                            {(student.sub_program || details.sub_program) && (
+                              <span
+                                style={{
+                                  fontSize: '11.5px',
+                                  color: '#334155',
+                                  fontWeight: 600,
+                                  lineHeight: 1.25,
+                                }}
+                              >
+                                {student.sub_program || details.sub_program}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: '12px', color: '#94a3b8' }}>—</span>
+                        )}
+                      </td>
+
+                      {/* Gender / 性別 */}
+                      <td>
+                        <span style={{ fontSize: '12.5px', color: '#1e293b' }}>
+                          {genderVal}
+                        </span>
+                      </td>
+
+                      {/* DOB & Age / 生年月日・年齢 */}
+                      <td>
+                        <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#1e293b' }}>
+                          {formatJapaneseBirthDate(student.date_of_birth)}
+                        </div>
+                        <div style={{ fontSize: '11.5px', color: 'var(--nikkou-red)', fontWeight: 600 }}>
+                          {ageVal}
+                        </div>
+                      </td>
+
+                      {/* Status */}
+                      <td>{renderStatusBadge(student.status)}</td>
+
+                      {/* Actions */}
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenDrawer(student)}
+                            className={styles.secondaryBtn}
+                            title="View student CV details"
+                            style={{ padding: '6px 12px' }}
+                          >
+                            <Eye size={14} />
+                            View
+                          </button>
+
+                          <Link
+                            href={`/dashboard/cv-maker/students/${student.id}/edit`}
+                            className={styles.secondaryBtn}
+                            title="Edit student CV details"
+                            style={{ padding: '6px 12px', textDecoration: 'none', color: '#1d4ed8' }}
+                          >
+                            <Edit3 size={14} />
+                            Edit
+                          </Link>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteStudent(student.id)}
+                            className={styles.secondaryBtn}
+                            title="Delete student record"
+                            style={{ padding: '6px 10px', color: '#dc2626' }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Side Drawer for Student CV Full Inspection */}
+      {activeStudent && (
+        <div className={styles.drawerBackdrop} onClick={() => setActiveStudent(null)}>
+          <div className={styles.drawerContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.drawerHeader}>
+              <div>
+                <h3 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--nikkou-navy)', margin: 0 }}>
+                  {activeStudent.details_json?.furigana || activeStudent.full_name}
+                </h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
+                  <span className={styles.codePill}>{activeStudent.student_code}</span>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                    {activeStudent.details_json?.name_native || ''}
+                  </span>
+                  {(activeStudent.program || activeStudent.details_json?.program) && (
+                    <span
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: 800,
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        background:
+                          (activeStudent.program || activeStudent.details_json?.program) === 'TITP/ESD'
+                            ? '#eff6ff'
+                            : (activeStudent.program || activeStudent.details_json?.program) === 'SSW'
+                              ? '#ecfdf5'
+                              : '#fffbeb',
+                        color:
+                          (activeStudent.program || activeStudent.details_json?.program) === 'TITP/ESD'
+                            ? '#1d4ed8'
+                            : (activeStudent.program || activeStudent.details_json?.program) === 'SSW'
+                              ? '#047857'
+                              : '#b45309',
+                        border: `1px solid ${(activeStudent.program || activeStudent.details_json?.program) === 'TITP/ESD'
+                          ? '#bfdbfe'
+                          : (activeStudent.program || activeStudent.details_json?.program) === 'SSW'
+                            ? '#a7f3d0'
+                            : '#fde68a'
+                          }`,
+                      }}
+                    >
+                      {activeStudent.program || activeStudent.details_json?.program}
+                      {(activeStudent.sub_program || activeStudent.details_json?.sub_program) && (
+                        <span> · {activeStudent.sub_program || activeStudent.details_json?.sub_program}</span>
+                      )}
+                    </span>
+                  )}
+                  <span
+                    style={{
+                      fontSize: '11.5px',
+                      fontWeight: 700,
+                      color: '#059669',
+                      background: '#ecfdf5',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      border: '1px solid #a7f3d0',
+                    }}
+                  >
+                    CV Preview
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Link
+                  href={`/dashboard/cv-maker/students/${activeStudent.id}/edit`}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    border: '1.5px solid #bfdbfe',
+                    background: '#eff6ff',
+                    color: '#1d4ed8',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                  }}
+                  title="Edit student CV information"
+                >
+                  <Edit3 size={16} />
+                  <span>Edit CV</span>
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={handleInitiatePrint}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    border: '1.5px solid var(--border-strong)',
+                    background: '#ffffff',
+                    color: 'var(--nikkou-navy)',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <Printer size={16} />
+                  <span>Print CV</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveStudent(null)}
+                  className={styles.closeBtn}
+                  title="Close"
+                  style={{
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '8px',
+                    background: '#f1f5f9',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#334155',
+                  }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            <div className={styles.drawerBody}>
+              {/* Quick Status Bar (Hidden during Print) */}
+              <div
+                className={styles.noPrint}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 16px',
+                  background: '#ffffff',
+                  border: '1px solid var(--border-light)',
+                  borderRadius: '10px',
+                  gap: '12px',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                    Program & Category:
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '12.5px',
+                      fontWeight: 700,
+                      color: 'var(--nikkou-navy)',
+                      background: '#f8fafc',
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border-light)',
+                    }}
+                  >
+                    {formatProgramBadge(
+                      activeStudent.program || activeStudent.details_json?.program,
+                      activeStudent.sub_program || activeStudent.details_json?.sub_program
+                    )}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                    Application Status:
+                  </span>
+                  <select
+                    value={activeStudent.status}
+                    disabled={updatingStatus}
+                    onChange={(e) => handleStatusChange(e.target.value)}
+                    style={{
+                      height: '34px',
+                      padding: '0 10px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border-strong)',
+                      fontSize: '12.5px',
+                      fontWeight: 700,
+                      outline: 'none',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <option value="submitted">Submitted</option>
+                    <option value="under_review">Under Review</option>
+                    <option value="verified">Verified</option>
+                    <option value="approved">Approved</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* PRINTABLE A4 CV DOCUMENT - REACT-TO-PRINT TARGET */}
+              <div
+                ref={cvPrintRef}
+                className="cv-printable-page"
+                style={{
+                  background: '#ffffff',
+                  width: '100%',
+                  maxWidth: '192mm',
+                  margin: '0 auto',
+                  padding: '16px 18px',
+                  boxSizing: 'border-box',
+                  fontFamily: 'var(--font-bilingual, "Noto Sans JP", "Noto Sans Bengali", "Hind Siliguri", sans-serif)',
+                  color: '#000000',
+                  lineHeight: 1.35,
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+                  borderRadius: '4px',
+                }}
+              >
+                {/* SECTION 1: HEADER & BASIC INFO & APPLICANT PHOTO */}
+                {(() => {
+                  const today = getJapaneseTodayDate();
+                  return (
+                    <div
+                      className="cv-section"
+                      data-cv-section
+                      style={{
+                        marginBottom: '8px',
+                        breakInside: 'avoid',
+                        pageBreakInside: 'avoid',
+                      }}
+                    >
+                      {/* Full-width Document Header: Title Centered, Date below, 番号/no box on the Right */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          marginBottom: '4px',
+                          position: 'relative',
+                        }}
+                      >
+                        {/* Left dummy spacer for perfect center symmetry */}
+                        <div style={{ width: '80px' }} />
+
+                        {/* Centered Title & Date */}
+                        <div style={{ textAlign: 'center' }}>
+                          <div
+                            style={{
+                              fontSize: '26px',
+                              fontWeight: 900,
+                              color: '#1f3864',
+                              letterSpacing: '2px',
+                              lineHeight: 1.15,
+                              fontFamily: 'var(--font-bilingual, "Noto Sans JP", "Noto Sans Bengali", "Hind Siliguri", sans-serif)',
+                            }}
+                          >
+                            履歴書 / জীবনবৃত্তান্ত
+                          </div>
+                          <div
+                            style={{
+                              fontSize: '11.5px',
+                              fontWeight: 700,
+                              color: '#1f3864',
+                              marginTop: '3px',
+                              letterSpacing: '0.2px',
+                            }}
+                          >
+                            作成日 / তৈরির তারিখ:&nbsp;&nbsp;&nbsp;&nbsp;
+                            <span>{today.year}年</span>&nbsp;&nbsp;&nbsp;&nbsp;
+                            <span>{today.month}月</span>&nbsp;&nbsp;&nbsp;&nbsp;
+                            <span>{today.day}日</span>
+                          </div>
+                        </div>
+
+                        {/* 番号 / no Box (Right aligned) */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            width: '80px',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              color: '#1f3864',
+                              marginBottom: '2px',
+                              letterSpacing: '0.2px',
+                            }}
+                          >
+                            番号/no
+                          </div>
+                          <div
+                            onClick={handleInitiatePrint}
+                            title="クリックして印刷番号を設定 / ক্লিক করে প্রিন্ট নম্বর নির্ধারণ করুন"
+                            style={{
+                              width: '70px',
+                              height: '44px',
+                              border: '2.5px solid #00a0e9',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              background: '#ffffff',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {printNumber ? (
+                              <span style={{ fontSize: '28px', fontWeight: 900, color: '#e60000', lineHeight: 1 }}>
+                                {printNumber}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Section 1 Header */}
+                      <div
+                        className="cv-section-title"
+                        data-cv-section-title
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          fontSize: '13.5px',
+                          fontWeight: 800,
+                          color: '#c00000',
+                          marginBottom: '3px',
+                          letterSpacing: '0.2px',
+                          breakAfter: 'avoid',
+                          pageBreakAfter: 'avoid',
+                        }}
+                      >
+                        <span style={{ width: '4px', height: '14px', background: '#c00000', borderRadius: '2px', display: 'inline-block', flexShrink: 0 }} />
+                        <span>基本情報 / প্রাথমিক তথ্য</span>
+                      </div>
+
+                      {/* Basic Info Table & Photo Side-by-Side with matched height */}
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
+                        {/* Basic Info Table */}
+                        <div
+                          style={{
+                            border: '1.5px solid #2b5585',
+                            background: '#ffffff',
+                            flex: 1,
+                            minWidth: 0,
+                          }}
+                        >
+                          <table
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              borderCollapse: 'collapse',
+                              tableLayout: 'fixed',
+                              fontSize: '11.5px',
+                            }}
+                          >
+                            <colgroup>
+                              <col style={{ width: '22%' }} />
+                              <col style={{ width: '42%' }} />
+                              <col style={{ width: '18%' }} />
+                              <col style={{ width: '18%' }} />
+                            </colgroup>
+                            <tbody>
+                              {/* Row 1: Furigana and Gender */}
+                              <tr style={{ borderBottom: '1px solid #2b5585' }}>
+                                <td
+                                  style={{
+                                    background: '#e8f0fe',
+                                    padding: '4px 6px',
+                                    fontWeight: 700,
+                                    color: '#1f3864',
+                                    borderRight: '1px solid #2b5585',
+                                    fontSize: '11px',
+                                    lineHeight: 1.2,
+                                  }}
+                                >
+                                  <div>フリガナ</div>
+                                  <div style={{ fontSize: '9px', color: '#475569' }}>ফুরিগানা</div>
+                                </td>
+                                <td
+                                  style={{
+                                    padding: '4px 6px',
+                                    fontWeight: 700,
+                                    color: '#000000',
+                                    borderRight: '1px solid #2b5585',
+                                    textAlign: 'center',
+                                    textTransform: 'uppercase',
+                                    fontSize: '12px',
+                                    wordBreak: 'break-word',
+                                  }}
+                                >
+                                  {activeStudent.details_json?.furigana || activeStudent.full_name}
+                                </td>
+                                <td
+                                  style={{
+                                    background: '#e8f0fe',
+                                    padding: '4px 6px',
+                                    fontWeight: 700,
+                                    color: '#1f3864',
+                                    borderRight: '1px solid #2b5585',
+                                    textAlign: 'center',
+                                    fontSize: '11px',
+                                    lineHeight: 1.2,
+                                  }}
+                                >
+                                  <div>性別</div>
+                                  <div style={{ fontSize: '9px', color: '#475569' }}>সেক্স</div>
+                                </td>
+                                <td
+                                  style={{
+                                    padding: '4px 6px',
+                                    fontWeight: 600,
+                                    color: '#000000',
+                                    textAlign: 'center',
+                                    fontSize: '11.5px',
+                                  }}
+                                >
+                                  {activeStudent.details_json?.gender_label || (activeStudent.gender === 'female' ? '女性' : '男性')}
+                                </td>
+                              </tr>
+
+                              {/* Row 2: Name and Marital Status */}
+                              <tr style={{ borderBottom: '1px solid #2b5585' }}>
+                                <td
+                                  style={{
+                                    background: '#e8f0fe',
+                                    padding: '4px 6px',
+                                    fontWeight: 700,
+                                    color: '#1f3864',
+                                    borderRight: '1px solid #2b5585',
+                                    fontSize: '11px',
+                                    lineHeight: 1.2,
+                                  }}
+                                >
+                                  <div>氏名</div>
+                                  <div style={{ fontSize: '9px', color: '#475569' }}>নাম</div>
+                                </td>
+                                <td
+                                  style={{
+                                    padding: '4px 6px',
+                                    fontWeight: 700,
+                                    color: '#000000',
+                                    borderRight: '1px solid #2b5585',
+                                    textAlign: 'center',
+                                    fontSize: '13px',
+                                    wordBreak: 'break-word',
+                                  }}
+                                >
+                                  {activeStudent.details_json?.name_native || activeStudent.full_name}
+                                </td>
+                                <td
+                                  style={{
+                                    background: '#e8f0fe',
+                                    padding: '4px 6px',
+                                    fontWeight: 700,
+                                    color: '#1f3864',
+                                    borderRight: '1px solid #2b5585',
+                                    textAlign: 'center',
+                                    fontSize: '11px',
+                                    lineHeight: 1.2,
+                                  }}
+                                >
+                                  <div>婚姻</div>
+                                  <div style={{ fontSize: '9px', color: '#475569' }}>বিবাহ</div>
+                                </td>
+                                <td
+                                  style={{
+                                    padding: '4px 6px',
+                                    fontWeight: 600,
+                                    color: '#000000',
+                                    textAlign: 'center',
+                                    fontSize: '11.5px',
+                                  }}
+                                >
+                                  {activeStudent.details_json?.marital_status || '独身'}
+                                </td>
+                              </tr>
+
+                              {/* Row 3: Date of Birth and Age */}
+                              <tr style={{ borderBottom: '1px solid #2b5585' }}>
+                                <td
+                                  style={{
+                                    background: '#e8f0fe',
+                                    padding: '4px 6px',
+                                    fontWeight: 700,
+                                    color: '#1f3864',
+                                    borderRight: '1px solid #2b5585',
+                                    fontSize: '11px',
+                                    lineHeight: 1.2,
+                                  }}
+                                >
+                                  <div>生年月日</div>
+                                  <div style={{ fontSize: '9px', color: '#475569' }}>জন্ম তারিখ</div>
+                                </td>
+                                <td
+                                  style={{
+                                    padding: '4px 6px',
+                                    fontWeight: 600,
+                                    color: '#000000',
+                                    borderRight: '1px solid #2b5585',
+                                    textAlign: 'center',
+                                    fontSize: '11.5px',
+                                  }}
+                                >
+                                  {activeStudent.details_json?.dob_japanese || formatJapaneseBirthDate(activeStudent.date_of_birth)}
+                                </td>
+                                <td
+                                  style={{
+                                    background: '#e8f0fe',
+                                    padding: '4px 6px',
+                                    fontWeight: 700,
+                                    color: '#1f3864',
+                                    borderRight: '1px solid #2b5585',
+                                    textAlign: 'center',
+                                    fontSize: '11px',
+                                    lineHeight: 1.2,
+                                  }}
+                                >
+                                  <div>年齢</div>
+                                  <div style={{ fontSize: '9px', color: '#475569' }}>বয়স</div>
+                                </td>
+                                <td
+                                  style={{
+                                    padding: '4px 6px',
+                                    fontWeight: 700,
+                                    color: '#000000',
+                                    textAlign: 'center',
+                                    fontSize: '12px',
+                                  }}
+                                >
+                                  {activeStudent.details_json?.age_display || '—'}
+                                </td>
+                              </tr>
+
+                              {/* Row 4: Contact Address */}
+                              <tr style={{ borderBottom: '1px solid #2b5585' }}>
+                                <td
+                                  style={{
+                                    background: '#e8f0fe',
+                                    padding: '4px 6px',
+                                    fontWeight: 700,
+                                    color: '#1f3864',
+                                    borderRight: '1px solid #2b5585',
+                                    fontSize: '11px',
+                                    lineHeight: 1.2,
+                                  }}
+                                >
+                                  <div>連絡先</div>
+                                  <div style={{ fontSize: '9px', color: '#475569' }}>ঠিকানা</div>
+                                </td>
+                                <td
+                                  colSpan={3}
+                                  style={{
+                                    padding: '4px 8px',
+                                    color: '#000000',
+                                    fontWeight: 600,
+                                    lineHeight: 1.3,
+                                    fontSize: '11.5px',
+                                    wordBreak: 'break-word',
+                                  }}
+                                >
+                                  {activeStudent.details_json?.address || '—'}
+                                </td>
+                              </tr>
+
+                              {/* Row 5: Phone Number */}
+                              <tr>
+                                <td
+                                  style={{
+                                    background: '#e8f0fe',
+                                    padding: '4px 6px',
+                                    fontWeight: 700,
+                                    color: '#1f3864',
+                                    borderRight: '1px solid #2b5585',
+                                    fontSize: '11px',
+                                    lineHeight: 1.2,
+                                  }}
+                                >
+                                  <div>電話</div>
+                                  <div style={{ fontSize: '9px', color: '#475569' }}>ফোন</div>
+                                </td>
+                                <td
+                                  colSpan={3}
+                                  style={{
+                                    padding: '4px 8px',
+                                    color: '#000000',
+                                    fontWeight: 700,
+                                    fontSize: '12px',
+                                  }}
+                                >
+                                  {activeStudent.details_json?.phone || activeStudent.phone || '—'}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Right: Applicant Formal Photo in Blue Frame */}
+                        <div
+                          style={{
+                            width: '136px',
+                            flexShrink: 0,
+                            border: '2px solid #2b5585',
+                            background: '#ffffff',
+                            boxSizing: 'border-box',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {activeStudent.details_json?.photo_data ? (
+                            <img
+                              src={activeStudent.details_json.photo_data}
+                              alt={activeStudent.full_name}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                            />
+                          ) : (
+                            <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '11.5px' }}>
+                              <Users size={32} style={{ margin: '0 auto 4px auto' }} />
+                              <div>写真 / ছবি</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* SECTION 2: 個人情報 / ব্যক্তিগত তথ্য (Fixed Table Layout to prevent column squishing) */}
+                <div
+                  className="cv-section"
+                  data-cv-section
+                  style={{
+                    marginBottom: '8px',
+                    breakInside: 'avoid',
+                    pageBreakInside: 'avoid',
+                  }}
+                >
+                  <div
+                    className="cv-section-title"
+                    data-cv-section-title
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '13.5px',
+                      fontWeight: 800,
+                      color: '#c00000',
+                      marginBottom: '3px',
+                      letterSpacing: '0.2px',
+                      breakAfter: 'avoid',
+                      pageBreakAfter: 'avoid',
+                    }}
+                  >
+                    <span style={{ width: '4px', height: '14px', background: '#c00000', borderRadius: '2px', display: 'inline-block', flexShrink: 0 }} />
+                    <span>個人情報 / ব্যক্তিগত তথ্য</span>
+                  </div>
+
+                  <div style={{ border: '1.5px solid #2b5585', background: '#ffffff', width: '100%', boxSizing: 'border-box' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: '11px' }}>
+                      <colgroup>
+                        <col style={{ width: '16.5%' }} />
+                        <col style={{ width: '16.5%' }} />
+                        <col style={{ width: '16.5%' }} />
+                        <col style={{ width: '16.5%' }} />
+                        <col style={{ width: '16.5%' }} />
+                        <col style={{ width: '17.5%' }} />
+                      </colgroup>
+                      <tbody>
+                        {/* Row 1: Eyesight, Color Blindness, Dominant Hand */}
+                        <tr style={{ borderBottom: '1px solid #2b5585' }}>
+                          <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
+                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>視力</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>দৃষ্টিশক্তি</div>
+                          </td>
+                          <td style={{ padding: '4px 6px', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11.5px', whiteSpace: 'nowrap' }}>
+                            {activeStudent.details_json?.eyesight || '—'}
+                          </td>
+                          <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
+                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>色覚異常</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>বর্ণান্ধতা</div>
+                          </td>
+                          <td style={{ padding: '4px 6px', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11.5px' }}>
+                            {activeStudent.details_json?.color_blindness || '—'}
+                          </td>
+                          <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
+                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>利き手</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>প্রভাবশালী হাত</div>
+                          </td>
+                          <td style={{ padding: '3px 4px', textAlign: 'center', wordBreak: 'break-word' }}>
+                            {(() => {
+                              const val = activeStudent.details_json?.dominant_hand;
+                              if (!val) return '—';
+                              if (val.includes(' / ')) {
+                                const [jp, bn] = val.split(' / ');
+                                return (
+                                  <div style={{ lineHeight: 1.2 }}>
+                                    <div style={{ fontWeight: 700, fontSize: '11px', color: '#000000' }}>{jp}</div>
+                                    <div style={{ fontSize: '9.5px', color: '#475569' }}>{bn}</div>
+                                  </div>
+                                );
+                              }
+                              return <span style={{ fontWeight: 600, fontSize: '11px' }}>{val}</span>;
+                            })()}
+                          </td>
+                        </tr>
+
+                        {/* Row 2: Weight, Height, Tattoo/Surgery */}
+                        <tr style={{ borderBottom: '1px solid #2b5585' }}>
+                          <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
+                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>体重</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>শরীরের ওজন</div>
+                          </td>
+                          <td style={{ padding: '4px 6px', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11.5px' }}>
+                            {activeStudent.details_json?.body_weight || '—'}
+                          </td>
+                          <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
+                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>身長</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>উচ্চতা</div>
+                          </td>
+                          <td style={{ padding: '4px 6px', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11.5px' }}>
+                            {activeStudent.details_json?.height || '—'}
+                          </td>
+                          <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
+                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>入れ墨・手術</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>ট্যাটু / সার্জারি</div>
+                          </td>
+                          <td style={{ padding: '4px 6px', fontWeight: 600, color: '#000000', textAlign: 'center', fontSize: '11.5px' }}>
+                            {activeStudent.details_json?.tattoo_surgery || '—'}
+                          </td>
+                        </tr>
+
+                        {/* Row 3: Smoking, Alcohol, Blood Type */}
+                        <tr style={{ borderBottom: '1px solid #2b5585' }}>
+                          <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
+                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>タバコ</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>ধূমপান?</div>
+                          </td>
+                          <td style={{ padding: '4px 6px', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11.5px' }}>
+                            {activeStudent.details_json?.smoking || '—'}
+                          </td>
+                          <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
+                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>お酒</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>মদ পান?</div>
+                          </td>
+                          <td style={{ padding: '4px 6px', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11.5px' }}>
+                            {activeStudent.details_json?.alcohol || '—'}
+                          </td>
+                          <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
+                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>血液型</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>রক্তের ধরন</div>
+                          </td>
+                          <td style={{ padding: '3px 4px', textAlign: 'center', wordBreak: 'break-word' }}>
+                            {(() => {
+                              const val = activeStudent.details_json?.blood_type;
+                              if (!val) return '—';
+                              if (val.includes(' / ')) {
+                                const [jp, bn] = val.split(' / ');
+                                return (
+                                  <div style={{ lineHeight: 1.2 }}>
+                                    <div style={{ fontWeight: 700, fontSize: '11px', color: '#000000' }}>{jp}</div>
+                                    <div style={{ fontSize: '9.5px', color: '#475569' }}>{bn}</div>
+                                  </div>
+                                );
+                              }
+                              return <span style={{ fontWeight: 700, fontSize: '11px' }}>{val}</span>;
+                            })()}
+                          </td>
+                        </tr>
+
+                        {/* Row 4: Hobby and Personality */}
+                        <tr style={{ borderBottom: '1px solid #2b5585' }}>
+                          <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
+                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>趣味</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>শখ</div>
+                          </td>
+                          <td colSpan={2} style={{ padding: '4px 8px', color: '#000000', borderRight: '1px solid #2b5585', lineHeight: 1.35, fontSize: '11px', wordBreak: 'break-word' }}>
+                            {activeStudent.details_json?.hobbies || '—'}
+                          </td>
+                          <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
+                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>性格</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>ব্যক্তিত্ব</div>
+                          </td>
+                          <td colSpan={2} style={{ padding: '4px 8px', color: '#000000', lineHeight: 1.35, fontSize: '11px', wordBreak: 'break-word' }}>
+                            {activeStudent.details_json?.personality || '—'}
+                          </td>
+                        </tr>
+
+                        {/* Row 5: Cooking, Medical history, Group living */}
+                        <tr style={{ borderBottom: '1px solid #2b5585' }}>
+                          <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
+                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>料理経験</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>রান্না</div>
+                          </td>
+                          <td style={{ padding: '4px 6px', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11.5px' }}>
+                            {activeStudent.details_json?.cooking || '—'}
+                          </td>
+                          <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
+                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>病歴</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>চিকিৎসা ইতিহাস</div>
+                          </td>
+                          <td style={{ padding: '4px 6px', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11.5px' }}>
+                            {activeStudent.details_json?.medical_history || '—'}
+                          </td>
+                          <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
+                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>集団生活</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>গ্রুপ লিভিং</div>
+                          </td>
+                          <td style={{ padding: '4px 6px', fontWeight: 600, color: '#000000', textAlign: 'center', fontSize: '11.5px' }}>
+                            {activeStudent.details_json?.group_living || '—'}
+                          </td>
+                        </tr>
+
+                        {/* Row 6: Personal Income, 5-Year Target Savings */}
+                        <tr style={{ borderBottom: '1px solid #2b5585' }}>
+                          <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
+                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>個人収入</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>ব্যক্তিগত আয়</div>
+                          </td>
+                          <td colSpan={2} style={{ padding: '3px 4px', borderRight: '1px solid #2b5585', textAlign: 'center', wordBreak: 'break-word' }}>
+                            {(() => {
+                              const val = activeStudent.details_json?.personal_income;
+                              if (!val) return '—';
+                              if (val.includes(' / ')) {
+                                const [jp, bn] = val.split(' / ');
+                                return (
+                                  <div style={{ lineHeight: 1.2 }}>
+                                    <div style={{ fontWeight: 700, fontSize: '11px', color: '#000000' }}>{jp}</div>
+                                    <div style={{ fontSize: '9.5px', color: '#475569' }}>{bn}</div>
+                                  </div>
+                                );
+                              }
+                              return <span style={{ fontWeight: 600, fontSize: '11px' }}>{val}</span>;
+                            })()}
+                          </td>
+                          <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
+                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>5年貯金目標</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>৫বছরে সঞ্চয়</div>
+                          </td>
+                          <td colSpan={2} style={{ padding: '3px 4px', textAlign: 'center', wordBreak: 'break-word' }}>
+                            {(() => {
+                              const val = activeStudent.details_json?.target_savings_5years;
+                              if (!val) return '—';
+                              if (val.includes(' / ')) {
+                                const [jp, bn] = val.split(' / ');
+                                return (
+                                  <div style={{ lineHeight: 1.25 }}>
+                                    <div style={{ fontWeight: 800, fontSize: '11.5px', color: '#047857' }}>{jp}</div>
+                                    <div style={{ fontWeight: 700, fontSize: '9.5px', color: '#047857' }}>{bn}</div>
+                                  </div>
+                                );
+                              }
+                              return <span style={{ fontWeight: 800, color: '#047857', fontSize: '11.5px' }}>{val}</span>;
+                            })()}
+                          </td>
+                        </tr>
+
+                        {/* Row 7: Motivation / 志望動機 */}
+                        <tr style={{ borderBottom: '1px solid #2b5585' }}>
+                          <td style={{ background: '#e8f0fe', padding: '5px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
+                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>志望動機</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>অনুপ্রেরণা</div>
+                          </td>
+                          <td colSpan={5} style={{ padding: '5px 8px', color: '#000000', lineHeight: 1.4, fontSize: '11px', wordBreak: 'break-word' }}>
+                            {activeStudent.details_json?.motivation || '—'}
+                          </td>
+                        </tr>
+
+                        {/* Row 8: Future Plan / 将来の目標 */}
+                        <tr style={{ borderBottom: '1px solid #2b5585' }}>
+                          <td style={{ background: '#e8f0fe', padding: '5px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
+                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>帰国後計画</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>ভবিষ্যৎ পরিকল্পনা</div>
+                          </td>
+                          <td colSpan={5} style={{ padding: '5px 8px', color: '#000000', lineHeight: 1.4, fontSize: '11px', wordBreak: 'break-word' }}>
+                            {activeStudent.details_json?.future_plan_after_japan || '—'}
+                          </td>
+                        </tr>
+
+                        {/* Row 9: Visa History & Type Applied */}
+                        <tr>
+                          <td style={{ background: '#e8f0fe', padding: '5px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
+                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>在留資格申請歴</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>ভিসা আবেদন</div>
+                          </td>
+                          <td colSpan={2} style={{ padding: '5px 8px', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', fontSize: '11.5px' }}>
+                            {activeStudent.details_json?.japan_visa_applied_before || '—'}
+                          </td>
+                          <td style={{ background: '#e8f0fe', padding: '5px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
+                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>申請資格</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>ভিসার ধরন</div>
+                          </td>
+                          <td colSpan={2} style={{ padding: '5px 8px', fontWeight: 600, color: '#000000', fontSize: '11.5px' }}>
+                            {activeStudent.details_json?.japan_visa_type_applied || '—'}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* SECTION 3: 学歴 / শিক্ষাগত যোগ্যতা (Natural Flow on Page 1, Unbreakable) */}
+                <div
+                  className="cv-section"
+                  data-cv-section
+                  style={{
+                    marginBottom: '8px',
+                    breakInside: 'avoid',
+                    pageBreakInside: 'avoid',
+                  }}
+                >
+                  <div
+                    className="cv-section-title"
+                    data-cv-section-title
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '13.5px',
+                      fontWeight: 800,
+                      color: '#c00000',
+                      marginBottom: '3px',
+                      letterSpacing: '0.2px',
+                      breakAfter: 'avoid',
+                      pageBreakAfter: 'avoid',
+                    }}
+                  >
+                    <span style={{ width: '4px', height: '14px', background: '#c00000', borderRadius: '2px', display: 'inline-block', flexShrink: 0 }} />
+                    <span>学歴 / শিক্ষাগত যোগ্যতা</span>
+                  </div>
+
+                  <div style={{ border: '1.5px solid #2b5585', background: '#ffffff', width: '100%', boxSizing: 'border-box' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: '11.5px' }}>
+                      <colgroup>
+                        <col style={{ width: '15%' }} />
+                        <col style={{ width: '15%' }} />
+                        <col style={{ width: '34%' }} />
+                        <col style={{ width: '18%' }} />
+                        <col style={{ width: '18%' }} />
+                      </colgroup>
+                      <thead>
+                        <tr style={{ background: '#e8f0fe', borderBottom: '1px solid #2b5585' }}>
+                          <th style={{ padding: '5px 6px', fontWeight: 700, color: '#1f3864', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11px', lineHeight: 1.2 }}>
+                            <div>開始年</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>শুরুর বছর</div>
+                          </th>
+                          <th style={{ padding: '5px 6px', fontWeight: 700, color: '#1f3864', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11px', lineHeight: 1.2 }}>
+                            <div>終了年</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>সমাপ্তি বছর</div>
+                          </th>
+                          <th style={{ padding: '5px 6px', fontWeight: 700, color: '#1f3864', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11px', lineHeight: 1.2 }}>
+                            <div>学校名</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>স্কুলের নাম</div>
+                          </th>
+                          <th style={{ padding: '5px 6px', fontWeight: 700, color: '#1f3864', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11px', lineHeight: 1.2 }}>
+                            <div>専攻</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>সাবজেক্ট</div>
+                          </th>
+                          <th style={{ padding: '5px 6px', fontWeight: 700, color: '#1f3864', textAlign: 'center', fontSize: '11px', lineHeight: 1.2 }}>
+                            <div>学位</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>যোগ্যতা</div>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {activeStudent.details_json?.education_history && activeStudent.details_json.education_history.length > 0 ? (
+                          activeStudent.details_json.education_history.map((edu: any, eIdx: number, arr: any[]) => (
+                            <tr
+                              key={eIdx}
+                              style={{
+                                borderBottom: eIdx === arr.length - 1 ? 'none' : '1px solid #2b5585',
+                              }}
+                            >
+                              <td style={{ padding: '4px 6px', textAlign: 'center', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', fontSize: '11.5px' }}>
+                                {edu.start_year_month || '—'}
+                              </td>
+                              <td style={{ padding: '4px 6px', textAlign: 'center', fontWeight: 600, color: edu.end_year_month === '現在も' ? '#047857' : '#000000', borderRight: '1px solid #2b5585', fontSize: '11.5px' }}>
+                                {edu.end_year_month || '—'}
+                              </td>
+                              <td style={{ padding: '4px 6px', textAlign: 'center', fontWeight: 700, color: '#000000', borderRight: '1px solid #2b5585', fontSize: '12px', wordBreak: 'break-word' }}>
+                                {edu.school_name || '—'}
+                              </td>
+                              <td style={{ padding: '4px 6px', textAlign: 'center', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', fontSize: '11.5px', wordBreak: 'break-word' }}>
+                                {edu.major_subject || '—'}
+                              </td>
+                              <td style={{ padding: '4px 6px', textAlign: 'center', fontWeight: 600, color: '#000000', fontSize: '11.5px', wordBreak: 'break-word' }}>
+                                {edu.qualification || '—'}
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={5} style={{ padding: '6px', textAlign: 'center', color: '#64748b', fontSize: '11.5px' }}>
+                              なし / কোনো তথ্য নেই
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* SECTION 4: その他言語 / অন্যান্য ভাষা (Natural Flow on Page 1, Unbreakable) */}
+                <div
+                  className="cv-section"
+                  data-cv-section
+                  style={{
+                    marginBottom: '8px',
+                    breakInside: 'avoid',
+                    pageBreakInside: 'avoid',
+                  }}
+                >
+                  <div
+                    className="cv-section-title"
+                    data-cv-section-title
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '13.5px',
+                      fontWeight: 800,
+                      color: '#c00000',
+                      marginBottom: '3px',
+                      letterSpacing: '0.2px',
+                      breakAfter: 'avoid',
+                      pageBreakAfter: 'avoid',
+                    }}
+                  >
+                    <span style={{ width: '4px', height: '14px', background: '#c00000', borderRadius: '2px', display: 'inline-block', flexShrink: 0 }} />
+                    <span>その他言語 / অন্যান্য ভাষা</span>
+                  </div>
+
+                  <div style={{ border: '1.5px solid #2b5585', background: '#ffffff', width: '100%', boxSizing: 'border-box' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: '11.5px' }}>
+                      <colgroup>
+                        <col style={{ width: '32%' }} />
+                        <col style={{ width: '18%' }} />
+                        <col style={{ width: '32%' }} />
+                        <col style={{ width: '18%' }} />
+                      </colgroup>
+                      <tbody>
+                        <tr>
+                          {/* Mother tongue (Bengali) Label */}
+                          <td style={{ padding: '4px 8px', background: '#e8f0fe', borderRight: '1px solid #2b5585', color: '#1f3864', lineHeight: 1.25, fontSize: '11px' }}>
+                            <div style={{ fontWeight: 700 }}>母国語（ベンガル語）【読み書き】</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>মাতৃভাষা (বাংলা)</div>
+                          </td>
+                          <td style={{ padding: '4px 6px', textAlign: 'center', borderRight: '1px solid #2b5585', fontWeight: 700, color: '#000000', fontSize: '12.5px' }}>
+                            {formatLanguageDisplay(activeStudent.details_json?.language_bengali)}
+                          </td>
+
+                          {/* English Label */}
+                          <td style={{ padding: '4px 8px', background: '#e8f0fe', borderRight: '1px solid #2b5585', color: '#1f3864', lineHeight: 1.25, fontSize: '11px' }}>
+                            <div style={{ fontWeight: 700 }}>英語【読み書き】</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>ইংরেজি</div>
+                          </td>
+                          <td style={{ padding: '4px 6px', textAlign: 'center', fontWeight: 700, color: '#000000', fontSize: '12.5px' }}>
+                            {formatLanguageDisplay(activeStudent.details_json?.language_english)}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* SECTION 5: 職歴 / কাজের ইতিহাস (Unbreakable: will move to Page 2 if insufficient room on Page 1) */}
+                <div
+                  className="cv-section"
+                  data-cv-section
+                  style={{
+                    marginBottom: '8px',
+                    breakInside: 'avoid',
+                    pageBreakInside: 'avoid',
+                  }}
+                >
+                  <div
+                    className="cv-section-title"
+                    data-cv-section-title
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '13.5px',
+                      fontWeight: 800,
+                      color: '#c00000',
+                      marginBottom: '3px',
+                      letterSpacing: '0.2px',
+                      breakAfter: 'avoid',
+                      pageBreakAfter: 'avoid',
+                    }}
+                  >
+                    <span style={{ width: '4px', height: '14px', background: '#c00000', borderRadius: '2px', display: 'inline-block', flexShrink: 0 }} />
+                    <span>職歴 / কাজের ইতিহাস</span>
+                  </div>
+
+                  <div style={{ border: '1.5px solid #2b5585', background: '#ffffff', width: '100%', boxSizing: 'border-box' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: '11.5px' }}>
+                      <colgroup>
+                        <col style={{ width: '15%' }} />
+                        <col style={{ width: '15%' }} />
+                        <col style={{ width: '32%' }} />
+                        <col style={{ width: '38%' }} />
+                      </colgroup>
+                      <thead>
+                        <tr style={{ background: '#e8f0fe', borderBottom: '1px solid #2b5585' }}>
+                          <th style={{ padding: '5px 6px', fontWeight: 700, color: '#1f3864', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11px', lineHeight: 1.2 }}>
+                            <div>開始年</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>শুরুর বছর</div>
+                          </th>
+                          <th style={{ padding: '5px 6px', fontWeight: 700, color: '#1f3864', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11px', lineHeight: 1.2 }}>
+                            <div>終了年</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>সমাপ্তি বছর</div>
+                          </th>
+                          <th style={{ padding: '5px 6px', fontWeight: 700, color: '#1f3864', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11px', lineHeight: 1.2 }}>
+                            <div>会社名</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>কোম্পানির নাম</div>
+                          </th>
+                          <th style={{ padding: '5px 6px', fontWeight: 700, color: '#1f3864', textAlign: 'center', fontSize: '11px', lineHeight: 1.2 }}>
+                            <div>業務内容</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>কাজের বিবরণ</div>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {activeStudent.details_json?.work_history && activeStudent.details_json.work_history.length > 0 ? (
+                          activeStudent.details_json.work_history.map((work: any, wIdx: number, arr: any[]) => (
+                            <tr
+                              key={wIdx}
+                              style={{
+                                borderBottom: wIdx === arr.length - 1 ? 'none' : '1px solid #2b5585',
+                              }}
+                            >
+                              <td style={{ padding: '4px 6px', textAlign: 'center', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', fontSize: '11.5px' }}>
+                                {work.start_year_month || '—'}
+                              </td>
+                              <td style={{ padding: '4px 6px', textAlign: 'center', fontWeight: 600, color: work.end_year_month === '現在も' ? '#047857' : '#000000', borderRight: '1px solid #2b5585', fontSize: '11.5px' }}>
+                                {work.end_year_month || '—'}
+                              </td>
+                              <td style={{ padding: '4px 6px', textAlign: 'center', fontWeight: 700, color: '#000000', borderRight: '1px solid #2b5585', fontSize: '12px', wordBreak: 'break-word' }}>
+                                {work.company_name || '—'}
+                              </td>
+                              <td style={{ padding: '4px 6px', textAlign: 'left', color: '#000000', lineHeight: 1.35, fontSize: '11px', wordBreak: 'break-word' }}>
+                                {work.job_description || '—'}
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={4} style={{ padding: '6px', textAlign: 'center', color: '#64748b', fontSize: '11.5px' }}>
+                              なし / নেই
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* SECTION 6: 家族 / পরিবার (Unbreakable) */}
+                <div
+                  className="cv-section"
+                  data-cv-section
+                  style={{
+                    marginBottom: '8px',
+                    breakInside: 'avoid',
+                    pageBreakInside: 'avoid',
+                  }}
+                >
+                  <div
+                    className="cv-section-title"
+                    data-cv-section-title
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '13.5px',
+                      fontWeight: 800,
+                      color: '#c00000',
+                      marginBottom: '3px',
+                      letterSpacing: '0.2px',
+                      breakAfter: 'avoid',
+                      pageBreakAfter: 'avoid',
+                    }}
+                  >
+                    <span style={{ width: '4px', height: '14px', background: '#c00000', borderRadius: '2px', display: 'inline-block', flexShrink: 0 }} />
+                    <span>家族 / পরিবার</span>
+                  </div>
+
+                  <div style={{ border: '1.5px solid #2b5585', background: '#ffffff', width: '100%', boxSizing: 'border-box' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: '11.5px' }}>
+                      <colgroup>
+                        <col style={{ width: '22%' }} />
+                        <col style={{ width: '14%' }} />
+                        <col style={{ width: '12%' }} />
+                        <col style={{ width: '20%' }} />
+                        <col style={{ width: '32%' }} />
+                      </colgroup>
+                      <thead>
+                        <tr style={{ background: '#e8f0fe', borderBottom: '1px solid #2b5585' }}>
+                          <th style={{ padding: '5px 6px', fontWeight: 700, color: '#1f3864', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11px', lineHeight: 1.2 }}>
+                            <div>氏名</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>নাম</div>
+                          </th>
+                          <th style={{ padding: '5px 6px', fontWeight: 700, color: '#1f3864', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11px', lineHeight: 1.2 }}>
+                            <div>続柄</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>সম্পর্ক</div>
+                          </th>
+                          <th style={{ padding: '5px 6px', fontWeight: 700, color: '#1f3864', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11px', lineHeight: 1.2 }}>
+                            <div>年齢</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>বয়স</div>
+                          </th>
+                          <th style={{ padding: '5px 6px', fontWeight: 700, color: '#1f3864', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11px', lineHeight: 1.2 }}>
+                            <div>職業</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>পেশা</div>
+                          </th>
+                          <th style={{ padding: '5px 6px', fontWeight: 700, color: '#1f3864', textAlign: 'center', fontSize: '11px', lineHeight: 1.2 }}>
+                            <div>在日親族 & 家族の賛成</div>
+                            <div style={{ fontSize: '9.5px', color: '#475569' }}>জাপানে আত্মীয় ও পরিবারের সম্মতি</div>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(() => {
+                          const members =
+                            activeStudent.details_json?.family_members &&
+                              activeStudent.details_json.family_members.length > 0
+                              ? activeStudent.details_json.family_members
+                              : [];
+                          const totalRows = Math.max(2, members.length);
+
+                          return Array.from({ length: totalRows }).map((_, rIdx) => {
+                            const m = members[rIdx];
+                            const isLastRow = rIdx === totalRows - 1;
+
+                            return (
+                              <tr
+                                key={`fam-row-${rIdx}`}
+                                style={{
+                                  borderBottom: isLastRow ? 'none' : '1px solid #2b5585',
+                                }}
+                              >
+                                <td style={{ padding: '4px 6px', textAlign: 'center', fontWeight: 700, color: '#000000', borderRight: '1px solid #2b5585', fontSize: '12px', wordBreak: 'break-word' }}>
+                                  {m?.name || (rIdx === 0 && members.length === 0 ? 'なし / নেই' : '—')}
+                                </td>
+                                <td style={{ padding: '4px 6px', textAlign: 'center', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', fontSize: '11.5px' }}>
+                                  {m?.relationship || '—'}
+                                </td>
+                                <td style={{ padding: '4px 6px', textAlign: 'center', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', fontSize: '11.5px', whiteSpace: 'nowrap' }}>
+                                  {formatFamilyMemberAge(m?.age)}
+                                </td>
+                                <td style={{ padding: '4px 6px', textAlign: 'center', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', fontSize: '11.5px', wordBreak: 'break-word' }}>
+                                  {m?.occupation || '—'}
+                                </td>
+
+                                {/* Right Combined Column: Relatives in Japan & Family Support */}
+                                {rIdx === 0 && (
+                                  <td
+                                    style={{
+                                      padding: '4px 8px',
+                                      textAlign: 'left',
+                                      fontSize: '11px',
+                                      color: '#000000',
+                                      borderBottom: totalRows > 1 ? '1px solid #2b5585' : 'none',
+                                      lineHeight: 1.35,
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
+                                    <span style={{ fontWeight: 700, color: '#1f3864' }}>在日親族 / জাপানে আত্মীয়:</span> {activeStudent.details_json?.relatives_in_japan || '—'}
+                                  </td>
+                                )}
+
+                                {rIdx === 1 && (
+                                  <td
+                                    rowSpan={Math.max(1, totalRows - 1)}
+                                    style={{
+                                      padding: '4px 8px',
+                                      textAlign: 'left',
+                                      fontSize: '11px',
+                                      color: '#000000',
+                                      lineHeight: 1.35,
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
+                                    <span style={{ fontWeight: 700, color: '#1f3864' }}>家族の賛成 / পরিবারের সম্মতি:</span> {activeStudent.details_json?.family_support_japan || '—'}
+                                  </td>
+                                )}
+                              </tr>
+                            );
+                          });
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* SECTION 7: 評価 / মূল্যায়ন (Unbreakable) */}
+                <div
+                  className="cv-section"
+                  data-cv-section
+                  style={{
+                    breakInside: 'avoid',
+                    pageBreakInside: 'avoid',
+                  }}
+                >
+                  <div
+                    className="cv-section-title"
+                    data-cv-section-title
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '13.5px',
+                      fontWeight: 800,
+                      color: '#c00000',
+                      marginBottom: '3px',
+                      letterSpacing: '0.2px',
+                      breakAfter: 'avoid',
+                      pageBreakAfter: 'avoid',
+                    }}
+                  >
+                    <span style={{ width: '4px', height: '14px', background: '#c00000', borderRadius: '2px', display: 'inline-block', flexShrink: 0 }} />
+                    <span>評価 / মূল্যায়ন</span>
+                  </div>
+
+                  <div style={{ border: '1.5px solid #2b5585', background: '#ffffff', width: '100%', boxSizing: 'border-box' }}>
+                    <div
+                      style={{
+                        padding: '6px 10px',
+                        minHeight: '60px',
+                        color: activeStudent.details_json?.evaluation ? '#000000' : '#64748b',
+                        lineHeight: 1.45,
+                        fontSize: '11.5px',
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                      }}
+                    >
+                      {activeStudent.details_json?.evaluation || '—'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {/* END OF PRINTABLE A4 CV DOCUMENT */}
+
+              {/* Submission Information (Hidden on Print) */}
+              <div className={`${styles.detailSection} ${styles.noPrint}`}>
+                <div className={styles.detailSectionTitle}>
+                  <Clock size={16} color="#1f3864" />
+                  Registration Details
+                </div>
+
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Target Program:</span>
+                  <span className={styles.detailValue} style={{ fontWeight: 700, color: 'var(--nikkou-navy)' }}>
+                    {activeStudent.program || activeStudent.details_json?.program || '—'}
+                  </span>
+                </div>
+
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Applied Category:</span>
+                  <span className={styles.detailValue} style={{ fontWeight: 700, color: 'var(--nikkou-navy)' }}>
+                    {activeStudent.sub_program || activeStudent.details_json?.sub_program || '—'}
+                  </span>
+                </div>
+
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Intake Source:</span>
+                  <span className={styles.detailValue}>
+                    {activeStudent.source === 'public_form' ? 'Public Form' : 'Direct Admin Entry'}
+                  </span>
+                </div>
+
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Submitted At:</span>
+                  <span className={styles.detailValue}>
+                    {new Date(activeStudent.created_at).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Prompt for Print Number (番号/no) with 'Keep Empty' Checkbox */}
+      {isAskingPrintNumber && (
+        <div
+          className={styles.noPrint}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+          }}
+          onClick={() => setIsAskingPrintNumber(false)}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: '16px',
+              width: '100%',
+              maxWidth: '460px',
+              padding: '26px 28px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              border: '1.5px solid #e2e8f0',
+              animation: 'fadeIn 0.2s ease',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <div
+                style={{
+                  width: '44px',
+                  height: '44px',
+                  borderRadius: '12px',
+                  background: '#eff6ff',
+                  border: '1.5px solid #bfdbfe',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#1d4ed8',
+                  flexShrink: 0,
+                }}
+              >
+                <Printer size={22} />
+              </div>
+              <div>
+                <h4 style={{ margin: 0, fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
+                  Set Print Number (番号/no)
+                </h4>
+                <p style={{ margin: '3px 0 0 0', fontSize: '12.5px', color: '#64748b' }}>
+                  Specify the number to print inside the top-right &ldquo;番号/no&rdquo; box of the CV.
+                </p>
+              </div>
+            </div>
+
+            {/* Live Preview Box & Input */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '20px',
+                padding: '18px',
+                background: '#f8fafc',
+                borderRadius: '12px',
+                border: '1px solid #e2e8f0',
+                marginBottom: '16px',
+              }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                  番号 / no
+                </span>
+                <div
+                  style={{
+                    width: '74px',
+                    height: '52px',
+                    border: '2.5px solid #00a0e9',
+                    background: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <span style={{ fontSize: '30px', fontWeight: 900, color: '#e60000', lineHeight: 1 }}>
+                    {printKeepEmpty ? '' : (tempPrintNumber || '1')}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                  Enter Print Number:
+                </label>
+                <input
+                  type="text"
+                  disabled={printKeepEmpty}
+                  value={printKeepEmpty ? '' : tempPrintNumber}
+                  onChange={(e) => setTempPrintNumber(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleConfirmPrint();
+                    }
+                  }}
+                  autoFocus={!printKeepEmpty}
+                  placeholder="e.g. 1"
+                  style={{
+                    width: '100%',
+                    height: '42px',
+                    padding: '0 12px',
+                    fontSize: '16px',
+                    fontWeight: 700,
+                    borderRadius: '8px',
+                    border: printKeepEmpty ? '1.5px solid #cbd5e1' : '2px solid #00a0e9',
+                    background: printKeepEmpty ? '#f1f5f9' : '#ffffff',
+                    color: printKeepEmpty ? '#94a3b8' : '#0f172a',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                    cursor: printKeepEmpty ? 'not-allowed' : 'text',
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Checkbox to keep empty */}
+            <div
+              style={{
+                marginBottom: '22px',
+                padding: '10px 14px',
+                background: printKeepEmpty ? '#eff6ff' : '#ffffff',
+                border: printKeepEmpty ? '1.5px solid #93c5fd' : '1px solid #e2e8f0',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+              }}
+              onClick={() => setPrintKeepEmpty((prev) => !prev)}
+            >
+              <input
+                type="checkbox"
+                id="keepEmptyCheckbox"
+                checked={printKeepEmpty}
+                onChange={(e) => setPrintKeepEmpty(e.target.checked)}
+                style={{
+                  width: '18px',
+                  height: '18px',
+                  accentColor: '#1d4ed8',
+                  cursor: 'pointer',
+                }}
+                onClick={(e) => e.stopPropagation()}
+              />
+              <label
+                htmlFor="keepEmptyCheckbox"
+                style={{
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  color: printKeepEmpty ? '#1d4ed8' : '#334155',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                Print with empty box (leave blank)
+              </label>
+            </div>
+
+            {/* Colorful Print Guidance Banner */}
+            <div
+              style={{
+                marginBottom: '20px',
+                padding: '10px 14px',
+                background: '#f0fdf4',
+                border: '1.5px solid #86efac',
+                borderRadius: '8px',
+                display: 'flex',
+                gap: '10px',
+                alignItems: 'flex-start',
+                fontSize: '12px',
+                lineHeight: 1.45,
+                color: '#166534',
+              }}
+            >
+              <span style={{ fontSize: '17px', flexShrink: 0 }}>🎨</span>
+              <div>
+                <div style={{ fontWeight: 800, marginBottom: '2px' }}>
+                  カラー印刷のヒント / রঙিন প্রিন্টের টিপস:
+                </div>
+                <div>
+                  印刷画面で青い背景や枠線が出ない場合、ブラウザ設定の「詳細設定」で<strong>「背景のグラフィック (Background graphics)」</strong>にチェックを入れ、<strong>「カラー (Color)」</strong>を選択してください。
+                </div>
+                <div style={{ fontSize: '11px', color: '#15803d', marginTop: '3px' }}>
+                  প্রিন্ট ডায়ালগে <strong>More settings</strong> &rarr; <strong>Background graphics</strong> এ টিক দিন এবং <strong>Color</strong> নিশ্চিত করুন।
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => setIsAskingPrintNumber(false)}
+                style={{
+                  padding: '9px 18px',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  color: '#475569',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleConfirmPrint()}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '9px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)',
+                  color: '#ffffff',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(29, 78, 216, 0.28)',
+                }}
+              >
+                <Printer size={16} />
+                <span>Confirm & Print</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
