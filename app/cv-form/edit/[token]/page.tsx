@@ -1415,7 +1415,7 @@ function StudentCvEditFormContent() {
                   ) : (
                     <>
                       <Send size={18} style={{ flexShrink: 0 }} />
-                      <span>Update & Resubmit Application / আবেদন আপডেট এবং পুনরায় জমা দিন</span>
+                      <span>Update & Resubmit Application</span>
                     </>
                   )}
                 </button>
