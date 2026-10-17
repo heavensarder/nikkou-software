@@ -1381,35 +1381,40 @@ function StudentCvEditFormContent() {
                 </div>
               </div>
 
-              {/* Bottom Actions Bar */}
+              {/* Form Actions: Update & Resubmit */}
               <div
+                className={styles.bottomActionGroup}
                 style={{
-                  display: 'flex',
-                  justifyContent: 'flex-end',
-                  marginTop: '32px',
-                  paddingTop: '20px',
-                  borderTop: '1px solid var(--border-light)',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginTop: '36px',
+                  paddingTop: '24px',
+                  borderTop: '1.5px solid var(--border-light, #e2e8f0)',
+                  width: '100%',
                 }}
               >
                 <button
                   type="submit"
                   disabled={submitting}
-                  className={styles.submitBtn}
+                  className={styles.submitButton}
                   style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
+                    maxWidth: '560px',
+                    width: '100%',
+                    minHeight: '52px',
+                    padding: '14px 28px',
+                    fontSize: '15px',
+                    fontWeight: 700,
                     cursor: submitting ? 'not-allowed' : 'pointer',
                   }}
                 >
                   {submitting ? (
                     <>
-                      <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
-                      <span>Updating Application...</span>
+                      <Loader2 size={18} style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+                      <span>Updating & Resubmitting... / আবেদন আপডেট হচ্ছে...</span>
                     </>
                   ) : (
                     <>
-                      <Send size={18} />
+                      <Send size={18} style={{ flexShrink: 0 }} />
                       <span>Update & Resubmit Application / আবেদন আপডেট এবং পুনরায় জমা দিন</span>
                     </>
                   )}
@@ -1417,6 +1422,11 @@ function StudentCvEditFormContent() {
               </div>
             </form>
           )}
+        </div>
+
+        {/* Footer Note */}
+        <div style={{ textAlign: 'center', marginTop: '20px', fontSize: '12px', color: 'var(--text-muted)' }}>
+          © 2026 Nikkou Centre International. Official Japanese Language School Portal.
         </div>
       </div>
     </div>
