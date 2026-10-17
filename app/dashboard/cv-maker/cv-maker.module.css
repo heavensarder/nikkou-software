@@ -182,6 +182,69 @@
   background-color: #fafbfc;
 }
 
+/* Real-time New Application Highlight */
+.newRow {
+  background-color: #f0fdf4 !important;
+}
+
+.newRow td {
+  background-color: #f0fdf4 !important;
+  transition: background-color 0.4s ease;
+}
+
+.newRow td:first-child {
+  border-left: 4px solid #10b981 !important;
+}
+
+.newRow:hover td {
+  background-color: #e6f9ed !important;
+}
+
+.newBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.35);
+  animation: pulseNewBadge 2.2s infinite ease-in-out;
+}
+
+.newBadgeDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background-color: #ffffff;
+  display: inline-block;
+  animation: pulseNewDot 1.2s infinite ease-in-out;
+}
+
+@keyframes pulseNewBadge {
+  0%, 100% {
+    box-shadow: 0 1px 3px rgba(16, 185, 129, 0.35);
+  }
+  50% {
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.6);
+  }
+}
+
+@keyframes pulseNewDot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.7);
+  }
+}
+
 /* Status Badges */
 .badge {
   display: inline-flex;
@@ -540,6 +603,38 @@
     background: #ffffff !important;
     box-shadow: none !important;
     border: none !important;
+  }
+
+  /* Multi-page Institute Watermark (Repeats centered on every printed page) */
+  :global(.cv-watermark-overlay) {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    pointer-events: none !important;
+    z-index: 9999 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  :global(.cv-watermark-logo) {
+    position: static !important;
+    width: 135mm !important;
+    height: 135mm !important;
+    max-width: 75% !important;
+    max-height: 75% !important;
+    object-fit: contain !important;
+    opacity: 0.065 !important;
+    filter: grayscale(10%) !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    pointer-events: none !important;
   }
 
   /* Prevent sections from dividing across pages */

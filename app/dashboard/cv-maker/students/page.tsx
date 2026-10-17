@@ -103,6 +103,27 @@ function playNotificationChime() {
   }
 }
 
+const STORAGE_NEW_IDS_KEY = 'nikkou_new_application_ids';
+
+function loadStoredNewIds(): Set<number> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = localStorage.getItem(STORAGE_NEW_IDS_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    return new Set(Array.isArray(parsed) ? parsed.map(Number) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function persistNewIds(ids: Set<number>) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_NEW_IDS_KEY, JSON.stringify(Array.from(ids)));
+  } catch {}
+}
+
 export default function StudentListPage() {
   const [students, setStudents] = useState<StudentCv[]>([]);
   const [loading, setLoading] = useState(true);
@@ -111,6 +132,24 @@ export default function StudentListPage() {
   const [newStudentNotification, setNewStudentNotification] = useState<StudentCv | null>(null);
   const isFirstLoadRef = useRef(true);
   const knownStudentIdsRef = useRef<Set<number>>(new Set());
+
+  // Load unread new applications from persistent storage on mount
+  useEffect(() => {
+    const stored = loadStoredNewIds();
+    if (stored.size > 0) {
+      setNewlyArrivedIds(stored);
+    }
+  }, []);
+
+  const handleMarkAsRead = (studentId: number) => {
+    setNewlyArrivedIds((prev) => {
+      if (!prev.has(studentId)) return prev;
+      const next = new Set(prev);
+      next.delete(studentId);
+      persistNewIds(next);
+      return next;
+    });
+  };
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
@@ -213,6 +252,36 @@ export default function StudentListPage() {
         overflow: visible !important;
         border: none !important;
         box-shadow: none !important;
+      }
+      /* Multi-page Institute Watermark (Repeats centered on every printed page) */
+      .cv-watermark-overlay {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        pointer-events: none !important;
+        z-index: 9999 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      .cv-watermark-logo {
+        position: static !important;
+        width: 135mm !important;
+        height: 135mm !important;
+        max-width: 75% !important;
+        max-height: 75% !important;
+        object-fit: contain !important;
+        opacity: 0.065 !important;
+        filter: grayscale(10%) !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        pointer-events: none !important;
       }
       /* Strict Unbreakable Rule: Never divide any section across pages */
       .cv-section,
@@ -373,27 +442,30 @@ export default function StudentListPage() {
               (s) => !knownStudentIdsRef.current.has(s.id)
             );
             if (newlyAdded.length > 0) {
-              const newIds = new Set(newlyAdded.map((s) => s.id));
-              setNewlyArrivedIds((prev) => new Set([...prev, ...newIds]));
+              const newIds = newlyAdded.map((s) => s.id);
+              setNewlyArrivedIds((prev) => {
+                const next = new Set([...prev, ...newIds]);
+                persistNewIds(next);
+                return next;
+              });
               setNewStudentNotification(newlyAdded[0]);
               playNotificationChime();
-
-              // Auto-clear highlight after 10s
-              setTimeout(() => {
-                setNewlyArrivedIds((prev) => {
-                  const updated = new Set(prev);
-                  newlyAdded.forEach((s) => updated.delete(s.id));
-                  return updated;
-                });
-              }, 10000);
             }
           }
 
-          knownStudentIdsRef.current = new Set(freshStudents.map((s) => s.id));
           if (isFirstLoadRef.current) {
             isFirstLoadRef.current = false;
+            // Validate stored unread IDs against fresh database records
+            const stored = loadStoredNewIds();
+            const freshIds = new Set(freshStudents.map((s) => s.id));
+            const valid = new Set([...stored].filter((id) => freshIds.has(id)));
+            if (valid.size !== stored.size) {
+              persistNewIds(valid);
+            }
+            setNewlyArrivedIds(valid);
           }
 
+          knownStudentIdsRef.current = new Set(freshStudents.map((s) => s.id));
           setStudents(freshStudents);
 
           // Keep activeStudent in preview drawer synced in realtime
@@ -473,6 +545,7 @@ export default function StudentListPage() {
   };
 
   const handleOpenDrawer = async (student: StudentCv) => {
+    handleMarkAsRead(student.id);
     setPrintNumber(''); // explicitly empty on preview!
     setTempPrintNumber('1');
     setPrintKeepEmpty(false);
@@ -922,19 +995,12 @@ export default function StudentListPage() {
                   return (
                     <tr
                       key={student.id}
-                      style={
-                        isNewlyArrived
-                          ? {
-                              backgroundColor: '#f0fdf4',
-                              transition: 'background-color 1.5s ease',
-                              boxShadow: 'inset 4px 0 0 #10b981',
-                            }
-                          : undefined
-                      }
+                      className={isNewlyArrived ? styles.newRow : undefined}
                     >
                       {/* Photo Thumbnail */}
                       <td>
                         <div
+                          onClick={() => handleOpenDrawer(student)}
                           style={{
                             width: '36px',
                             height: '46px',
@@ -945,7 +1011,9 @@ export default function StudentListPage() {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
+                            cursor: 'pointer',
                           }}
+                          title="Click to view student CV details"
                         >
                           {photoSrc ? (
                             <img
@@ -964,17 +1032,8 @@ export default function StudentListPage() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <span className={styles.codePill}>{student.student_code}</span>
                           {isNewlyArrived && (
-                            <span
-                              style={{
-                                padding: '2px 6px',
-                                borderRadius: '4px',
-                                fontSize: '10px',
-                                fontWeight: 800,
-                                backgroundColor: '#10b981',
-                                color: '#ffffff',
-                                letterSpacing: '0.5px',
-                              }}
-                            >
+                            <span className={styles.newBadge} title="New application">
+                              <span className={styles.newBadgeDot} />
                               NEW
                             </span>
                           )}
@@ -983,7 +1042,17 @@ export default function StudentListPage() {
 
                       {/* Student Name / 氏名 */}
                       <td>
-                        <div style={{ fontWeight: 700, color: 'var(--nikkou-navy)', textTransform: 'uppercase', fontSize: '13.5px' }}>
+                        <div
+                          onClick={() => handleOpenDrawer(student)}
+                          style={{
+                            fontWeight: 700,
+                            color: 'var(--nikkou-navy)',
+                            textTransform: 'uppercase',
+                            fontSize: '13.5px',
+                            cursor: 'pointer',
+                          }}
+                          title="Click to view student CV details"
+                        >
                           {nameVal !== '—' ? nameVal : furiganaVal}
                         </div>
                         {furiganaVal && furiganaVal !== nameVal && (
@@ -1139,6 +1208,7 @@ export default function StudentListPage() {
 
                           <Link
                             href={`/dashboard/cv-maker/students/${student.id}/edit`}
+                            onClick={() => handleMarkAsRead(student.id)}
                             className={styles.secondaryBtn}
                             title="Edit student CV details"
                             style={{ padding: '6px 12px', textDecoration: 'none', color: '#1d4ed8' }}
@@ -1287,6 +1357,7 @@ export default function StudentListPage() {
 
                 <Link
                   href={`/dashboard/cv-maker/students/${activeStudent.id}/edit`}
+                  onClick={() => handleMarkAsRead(activeStudent.id)}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -1510,6 +1581,7 @@ export default function StudentListPage() {
                 ref={cvPrintRef}
                 className="cv-printable-page"
                 style={{
+                  position: 'relative',
                   background: '#ffffff',
                   width: '100%',
                   maxWidth: '192mm',
@@ -1525,6 +1597,45 @@ export default function StudentListPage() {
                   borderRadius: '4px',
                 }}
               >
+                {/* Official Institute Watermark (Centered on preview, repeated on every printed page via position: fixed in print mode) */}
+                <div
+                  className="cv-watermark-overlay"
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    width: '100%',
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    pointerEvents: 'none',
+                    zIndex: 10,
+                    overflow: 'hidden',
+                  }}
+                >
+                  <img
+                    src="/images/watermark.png"
+                    alt="Nikkou Centre Watermark"
+                    className="cv-watermark-logo"
+                    style={{
+                      position: 'sticky',
+                      top: '32vh',
+                      width: '135mm',
+                      height: '135mm',
+                      maxWidth: '75%',
+                      maxHeight: '75%',
+                      objectFit: 'contain',
+                      opacity: 0.065,
+                      filter: 'grayscale(10%)',
+                      pointerEvents: 'none',
+                      userSelect: 'none',
+                    }}
+                  />
+                </div>
                 {/* SECTION 1: HEADER & BASIC INFO & APPLICANT PHOTO */}
                 {(() => {
                   const today = getJapaneseTodayDate();

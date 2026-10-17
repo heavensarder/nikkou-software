@@ -173,6 +173,14 @@ function EditStudentCvContent() {
         // Clear any old local cache for this student to avoid stale overrides
         try {
           localStorage.removeItem(`nikkou_admin_cv_edit_draft_${studentId}`);
+          const rawNewIds = localStorage.getItem('nikkou_new_application_ids');
+          if (rawNewIds) {
+            const arr = JSON.parse(rawNewIds);
+            if (Array.isArray(arr) && arr.includes(Number(studentId))) {
+              const updated = arr.filter((x: any) => Number(x) !== Number(studentId));
+              localStorage.setItem('nikkou_new_application_ids', JSON.stringify(updated));
+            }
+          }
         } catch {
           // ignore
         }
