@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, use } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import PhotoUploadField from '@/components/PhotoUploadField';
 import ProgramCategorySection from '@/components/ProgramCategorySection';
@@ -36,13 +37,9 @@ import {
 } from '@/lib/cv-normalizer';
 import styles from '../../cv-form.module.css';
 
-interface PageProps {
-  params: Promise<{ token: string }>;
-}
-
-export default function StudentCvEditForm({ params }: PageProps) {
-  const resolvedParams = use(params);
-  const token = resolvedParams.token;
+function StudentCvEditFormContent() {
+  const params = useParams();
+  const token = (params?.token as string) || '';
 
   // Loading & Access States
   const [loading, setLoading] = useState(true);
@@ -1428,5 +1425,22 @@ export default function StudentCvEditForm({ params }: PageProps) {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function StudentCvEditFormPage() {
+  return (
+    <Suspense
+      fallback={
+        <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ textAlign: 'center', color: 'var(--nikkou-navy)' }}>
+            <Loader2 size={36} className="animate-spin" style={{ margin: '0 auto 12px auto' }} />
+            <div style={{ fontSize: '15px', fontWeight: 700 }}>Loading edit form...</div>
+          </div>
+        </div>
+      }
+    >
+      <StudentCvEditFormContent />
+    </Suspense>
   );
 }
