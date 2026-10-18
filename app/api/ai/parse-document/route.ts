@@ -183,7 +183,8 @@ IMPORTANT EXTRACTION PRINCIPLES:
      "無職 / বেকার" (Unemployed / None)
      "その他 / অন্যান্য" (Other)
    - family_members.age:
-     Format as e.g. "54歳 / ৫৪ বছর" or numeric string.
+     Format as e.g. "54歳 / ৫৪ বছর", numeric string, or if deceased/late format strictly as "死亡 / মৃত".
+     When age is "死亡 / মৃত", set occupation to "-".
 
 3. SPECIAL HINTS FOR RESUMES:
    - Extract Father's Name and Mother's Name into family_members as "父 / পিতা" and "母 / মা".

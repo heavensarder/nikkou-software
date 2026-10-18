@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Plus, Trash2, Users } from 'lucide-react';
 import { FamilyMemberEntry } from '@/types/cv';
 
@@ -41,10 +41,26 @@ export function toBengaliNumber(num: number): string {
     .join('');
 }
 
-export const FAMILY_AGE_OPTIONS: string[] = Array.from({ length: 100 }, (_, i) => {
-  const age = i + 1;
-  return `${age}歳 / ${toBengaliNumber(age)} বছর`;
-});
+export const DECEASED_AGE_OPTION = '死亡 / মৃত';
+
+export function isDeceasedAge(val: string | null | undefined): boolean {
+  if (!val) return false;
+  const s = String(val).trim();
+  return (
+    s.includes('死亡') ||
+    s.includes('মৃত') ||
+    s.toLowerCase().includes('deceased') ||
+    s.toLowerCase().includes('dead')
+  );
+}
+
+export const FAMILY_AGE_OPTIONS: string[] = [
+  DECEASED_AGE_OPTION,
+  ...Array.from({ length: 100 }, (_, i) => {
+    const age = i + 1;
+    return `${age}歳 / ${toBengaliNumber(age)} বছর`;
+  }),
+];
 
 export const OCCUPATION_OPTIONS = [
   '建設業 / কনস্ট্রাকশনের কাজ করেন',
@@ -94,9 +110,36 @@ export default function FamilyInfoSection({
   onChangeFamilySupportJapan,
   disabled = false,
 }: FamilyInfoSectionProps) {
+  // Synchronize occupation to '-' if any entry is deceased
+  useEffect(() => {
+    let hasChanges = false;
+    const checked = entries.map((entry) => {
+      if (isDeceasedAge(entry.age) && entry.occupation !== '-') {
+        hasChanges = true;
+        return { ...entry, occupation: '-' };
+      }
+      return entry;
+    });
+    if (hasChanges) {
+      onChangeEntries(checked);
+    }
+  }, [entries, onChangeEntries]);
+
   const handleFieldChange = (index: number, field: keyof FamilyMemberEntry, value: string) => {
     const updated = [...entries];
-    updated[index] = { ...updated[index], [field]: value };
+    if (field === 'age') {
+      const isDeceased = isDeceasedAge(value);
+      if (isDeceased) {
+        updated[index] = { ...updated[index], age: value, occupation: '-' };
+      } else {
+        const wasDeceased = isDeceasedAge(updated[index].age);
+        const newOccupation =
+          wasDeceased && updated[index].occupation === '-' ? '' : updated[index].occupation;
+        updated[index] = { ...updated[index], age: value, occupation: newOccupation };
+      }
+    } else {
+      updated[index] = { ...updated[index], [field]: value };
+    }
     onChangeEntries(updated);
   };
 
@@ -425,57 +468,85 @@ export default function FamilyInfoSection({
                 >
                   職業 / পেশা
                 </label>
-                <select
-                  value={
-                    OCCUPATION_OPTIONS.includes(entry.occupation)
-                      ? entry.occupation
-                      : (entry.occupation ? 'その他 / অন্যান্য' : '')
-                  }
-                  disabled={disabled}
-                  onChange={(e) => handleFieldChange(idx, 'occupation', e.target.value)}
-                  style={{
-                    width: '100%',
-                    height: '42px',
-                    padding: '0 12px',
-                    borderRadius: '8px',
-                    border: '1.5px solid var(--border-light)',
-                    fontSize: '13.5px',
-                    color: entry.occupation ? 'var(--text-primary)' : '#94a3b8',
-                    background: '#ffffff',
-                    outline: 'none',
-                    cursor: disabled ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  <option value="">職業を選択 / পেশা নির্বাচন করুন</option>
-                  {OCCUPATION_OPTIONS.map((occ) => (
-                    <option key={occ} value={occ}>
-                      {occ}
-                    </option>
-                  ))}
-                  {entry.occupation && !OCCUPATION_OPTIONS.includes(entry.occupation) && (
-                    <option value={entry.occupation}>{entry.occupation}</option>
-                  )}
-                </select>
-                {(entry.occupation === 'その他 / অন্যান্য' || (!OCCUPATION_OPTIONS.includes(entry.occupation) && entry.occupation)) && (
-                  <input
-                    type="text"
-                    value={entry.occupation === 'その他 / অন্যান্য' ? '' : entry.occupation}
-                    disabled={disabled}
-                    onChange={(e) => handleFieldChange(idx, 'occupation', e.target.value || 'その他 / অন্যান্য')}
-                    placeholder="具体的な職業を入力 / পেশার বিবরণ লিখুন"
-                    style={{
-                      width: '100%',
-                      height: '38px',
-                      padding: '0 10px',
-                      borderRadius: '6px',
-                      border: '1.5px solid var(--border-light)',
-                      fontSize: '12.5px',
-                      color: 'var(--text-primary)',
-                      outline: 'none',
-                      marginTop: '6px',
-                    }}
-                  />
-                )}
+                {(() => {
+                  const isDeceased = isDeceasedAge(entry.age);
+                  return (
+                    <>
+                      <select
+                        value={
+                          isDeceased
+                            ? '-'
+                            : OCCUPATION_OPTIONS.includes(entry.occupation)
+                              ? entry.occupation
+                              : entry.occupation
+                                ? (entry.occupation === '-' ? '-' : 'その他 / অন্যান্য')
+                                : ''
+                        }
+                        disabled={disabled || isDeceased}
+                        onChange={(e) => handleFieldChange(idx, 'occupation', e.target.value)}
+                        style={{
+                          width: '100%',
+                          height: '42px',
+                          padding: '0 12px',
+                          borderRadius: '8px',
+                          border: isDeceased ? '1.5px solid #cbd5e1' : '1.5px solid var(--border-light)',
+                          fontSize: '13.5px',
+                          color: isDeceased ? '#64748b' : entry.occupation ? 'var(--text-primary)' : '#94a3b8',
+                          background: isDeceased ? '#f1f5f9' : '#ffffff',
+                          outline: 'none',
+                          cursor: disabled || isDeceased ? 'not-allowed' : 'pointer',
+                          fontWeight: isDeceased ? 700 : 400,
+                        }}
+                        title={
+                          isDeceased
+                            ? '年齢が「死亡」のため、職業は「-」に設定されています / বয়স মৃত হওয়ায় পেশা প্রযোজ্য নয় (-)'
+                            : undefined
+                        }
+                      >
+                        {isDeceased ? (
+                          <option value="-">-</option>
+                        ) : (
+                          <>
+                            <option value="">職業を選択 / পেশা নির্বাচন করুন</option>
+                            <option value="-">-</option>
+                            {OCCUPATION_OPTIONS.map((occ) => (
+                              <option key={occ} value={occ}>
+                                {occ}
+                              </option>
+                            ))}
+                            {entry.occupation && entry.occupation !== '-' && !OCCUPATION_OPTIONS.includes(entry.occupation) && (
+                              <option value={entry.occupation}>{entry.occupation}</option>
+                            )}
+                          </>
+                        )}
+                      </select>
+                      {!isDeceased &&
+                        (entry.occupation === 'その他 / অন্যান্য' ||
+                          (!OCCUPATION_OPTIONS.includes(entry.occupation) &&
+                            entry.occupation &&
+                            entry.occupation !== '-')) && (
+                          <input
+                            type="text"
+                            value={entry.occupation === 'その他 / অন্যান্য' ? '' : entry.occupation}
+                            disabled={disabled}
+                            onChange={(e) => handleFieldChange(idx, 'occupation', e.target.value || 'その他 / অন্যান্য')}
+                            placeholder="具体的な職業を入力 / পেশার বিবরণ লিখুন"
+                            style={{
+                              width: '100%',
+                              height: '38px',
+                              padding: '0 10px',
+                              borderRadius: '6px',
+                              border: '1.5px solid var(--border-light)',
+                              fontSize: '12.5px',
+                              color: 'var(--text-primary)',
+                              outline: 'none',
+                              marginTop: '6px',
+                            }}
+                          />
+                        )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>

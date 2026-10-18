@@ -55,6 +55,14 @@ export function formatFamilyMemberAge(val: string | null | undefined): string {
   if (!val) return '—';
   const trimmed = String(val).trim();
   if (!trimmed) return '—';
+  if (
+    trimmed.includes('死亡') ||
+    trimmed.includes('মৃত') ||
+    trimmed.toLowerCase().includes('deceased') ||
+    trimmed.toLowerCase().includes('dead')
+  ) {
+    return '死亡 / মৃত';
+  }
   const bnDigits: { [k: string]: string } = {
     '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4',
     '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9',
@@ -2200,7 +2208,7 @@ export default function StudentListPage() {
                         {/* Row 3: Smoking, Alcohol, Blood Type */}
                         <tr style={{ borderBottom: '1px solid #2b5585' }}>
                           <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
-                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>タバコ</div>
+                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>喫煙習慣</div>
                             {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>ধূমপান?</div>}
                           </td>
                           <td style={{ padding: '4px 6px', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11.5px' }}>
@@ -2209,7 +2217,7 @@ export default function StudentListPage() {
                               : (activeStudent.details_json?.smoking || '—')}
                           </td>
                           <td style={{ background: '#e8f0fe', padding: '4px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
-                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>お酒</div>
+                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>飲酒習慣</div>
                             {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>মদ পান?</div>}
                           </td>
                           <td style={{ padding: '4px 6px', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11.5px' }}>
@@ -2367,8 +2375,8 @@ export default function StudentListPage() {
                         {/* Row 8: Future Plan / 将来の目標 */}
                         <tr style={{ borderBottom: '1px solid #2b5585' }}>
                           <td style={{ background: '#e8f0fe', padding: '5px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
-                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>帰国後計画</div>
-                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>ভবিষ্যৎ পরিকল্পনা</div>}
+                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>将来の目標</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>ভবিষ্যতের লক্ষ্য</div>}
                           </td>
                           <td colSpan={5} style={{ padding: '5px 8px', color: '#000000', lineHeight: 1.4, fontSize: '11px', wordBreak: 'break-word' }}>
                             {formatCvFieldValue(
@@ -2382,19 +2390,23 @@ export default function StudentListPage() {
                         {/* Row 9: Visa History & Type Applied */}
                         <tr>
                           <td style={{ background: '#e8f0fe', padding: '5px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
-                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>在留資格申請歴</div>
-                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>ভিসা আবেদন</div>}
+                            <div style={{ fontWeight: 700, fontSize: '10.5px', color: '#1f3864', lineHeight: 1.25 }}>日本の在留資格申請経験</div>
+                            {printVersion === 'student' && <div style={{ fontSize: '9px', color: '#475569', lineHeight: 1.2 }}>ভিসা আবেদন</div>}
                           </td>
-                          <td colSpan={2} style={{ padding: '5px 8px', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', fontSize: '11.5px' }}>
+                          <td style={{ padding: '5px 8px', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', textAlign: 'center', fontSize: '11.5px' }}>
                             {printVersion === 'japanese'
                               ? stripBengali(activeStudent.details_json?.japan_visa_applied_before) || '—'
                               : (activeStudent.details_json?.japan_visa_applied_before || '—')}
                           </td>
-                          <td style={{ background: '#e8f0fe', padding: '5px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
-                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>申請資格</div>
-                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>ভিসার ধরন</div>}
+                          <td colSpan={2} style={{ background: '#e8f0fe', padding: '5px 8px', borderRight: '1px solid #2b5585', lineHeight: 1.25 }}>
+                            <div style={{ fontWeight: 700, fontSize: '10.5px', color: '#1f3864' }}>申請したことがある場合、どの資格に申請したか</div>
+                            {printVersion === 'student' && (
+                              <div style={{ fontSize: '9px', color: '#475569', marginTop: '1px' }}>
+                                যদি তাই হয়, আপনি কি ভিসার জন্য আবেদন করেছেন?
+                              </div>
+                            )}
                           </td>
-                          <td colSpan={2} style={{ padding: '5px 8px', fontWeight: 600, color: '#000000', fontSize: '11.5px' }}>
+                          <td colSpan={2} style={{ padding: '5px 8px', fontWeight: 600, color: '#000000', fontSize: '11.5px', textAlign: 'center' }}>
                             {printVersion === 'japanese'
                               ? stripBengali(activeStudent.details_json?.japan_visa_type_applied) || '—'
                               : (activeStudent.details_json?.japan_visa_type_applied || '—')}
@@ -2763,7 +2775,16 @@ export default function StudentListPage() {
                                   {printVersion === 'japanese' ? formatPureJapaneseAge(m?.age) : formatFamilyMemberAge(m?.age)}
                                 </td>
                                 <td style={{ padding: '4px 6px', textAlign: 'center', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', fontSize: '11.5px', wordBreak: 'break-word' }}>
-                                  {printVersion === 'japanese' ? stripBengali(m?.occupation) || '—' : (m?.occupation || '—')}
+                                  {(() => {
+                                    const isDeceased =
+                                      m?.age &&
+                                      (m.age.includes('死亡') ||
+                                        m.age.includes('মৃত') ||
+                                        m.age.toLowerCase().includes('deceased') ||
+                                        m.age.toLowerCase().includes('dead'));
+                                    if (isDeceased) return '-';
+                                    return printVersion === 'japanese' ? stripBengali(m?.occupation) || '—' : (m?.occupation || '—');
+                                  })()}
                                 </td>
 
                                 {/* Right Combined Column: Relatives in Japan & Family Support */}

@@ -237,13 +237,17 @@ export default function FixedStudentCvForm() {
 
     // Family Members
     if (Array.isArray(data.family_members) && data.family_members.length > 0) {
-      const mappedFam = data.family_members.map((f: any, idx: number) => ({
-        id: `fam-ai-${idx}-${Date.now()}`,
-        name: f.name ? String(f.name).toUpperCase() : '',
-        relationship: normalizeRelationship(f.relationship),
-        age: normalizeFamilyAge(f.age),
-        occupation: normalizeOccupation(f.occupation),
-      }));
+      const mappedFam = data.family_members.map((f: any, idx: number) => {
+        const normAge = normalizeFamilyAge(f.age);
+        const isDeceased = normAge.includes('死亡') || normAge.includes('মৃত');
+        return {
+          id: `fam-ai-${idx}-${Date.now()}`,
+          name: f.name ? String(f.name).toUpperCase() : '',
+          relationship: normalizeRelationship(f.relationship),
+          age: normAge,
+          occupation: isDeceased ? '-' : normalizeOccupation(f.occupation),
+        };
+      });
       while (mappedFam.length < 3) {
         mappedFam.push({ id: `fam-ai-${mappedFam.length}`, name: '', relationship: '', age: '', occupation: '' });
       }

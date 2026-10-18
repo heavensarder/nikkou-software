@@ -1424,7 +1424,7 @@ function EditStudentCvContent() {
               {/* Alcohol */}
               <div>
                 <label style={{ display: 'block', fontSize: '13.5px', fontWeight: 700, color: 'var(--nikkou-navy)', marginBottom: '8px' }}>
-                  お酒 / মদ পান?
+                  飲酒習慣 / মদ পান?
                 </label>
                 <select
                   value={alcohol}
@@ -1534,7 +1534,7 @@ function EditStudentCvContent() {
               {/* Japan Visa Applied Before */}
               <div>
                 <label style={{ display: 'block', fontSize: '13.5px', fontWeight: 700, color: 'var(--nikkou-navy)', marginBottom: '8px' }}>
-                  在留資格申請歴 / আগে ভিসা আবেদন
+                  日本の在留資格申請経験 / আপনি কি কখনো জাপানের ভিসা জন্য আবেদন করেছেন?
                 </label>
                 <select
                   value={japanVisaAppliedBefore}
@@ -1549,7 +1549,7 @@ function EditStudentCvContent() {
               {/* Japan Visa Type Applied */}
               <div>
                 <label style={{ display: 'block', fontSize: '13.5px', fontWeight: 700, color: 'var(--nikkou-navy)', marginBottom: '8px' }}>
-                  申請資格 / ভিসার ধরন
+                  申請したことがある場合、どの資格に申請したか / যদি তাই হয়, আপনি কি ভিসার জন্য আবেদন করেছেন?
                 </label>
                 <input
                   type="text"

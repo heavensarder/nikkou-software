@@ -26,7 +26,7 @@ Phrasing style:
 - End sentences with polite structures like 「〜と考えております」「〜に貢献したいと存じます」「〜強い意欲を持っております」.
 - Do NOT sound robotic or like a direct word-for-word dictionary translation. Use natural Japanese sentence conjunctions.`,
 
-  future_plan: `The user input describes career goals after completing the program in Japan (将来の目標 / 帰国後計画).
+  future_plan: `The user input describes career goals after completing the program in Japan (将来の目標).
 Translate into formal, constructive Japanese resume phrasing.
 It should convey a clear, positive vision of utilizing skills learned in Japan to build a career or contribute to industry back home or globally.
 Phrasing style:

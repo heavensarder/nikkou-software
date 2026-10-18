@@ -949,7 +949,7 @@ function StudentCvEditFormContent() {
                 <div className={styles.grid3}>
                   <div className={styles.formField}>
                     <label className={styles.formLabel}>
-                      タバコ / ধূমপান
+                      喫煙習慣 / ধূমপান
                     </label>
                     <select
                       value={smoking}
@@ -968,7 +968,7 @@ function StudentCvEditFormContent() {
 
                   <div className={styles.formField}>
                     <label className={styles.formLabel}>
-                      お酒（アルコール） / অ্যালকোহল
+                      飲酒習慣 / মদ পান?
                     </label>
                     <select
                       value={alcohol}

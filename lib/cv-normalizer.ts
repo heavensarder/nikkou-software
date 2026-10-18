@@ -368,6 +368,9 @@ export function normalizeRelationship(val: any): string {
 export function normalizeOccupation(val: any): string {
   if (!val) return '';
   const s = String(val).toLowerCase().trim();
+  if (s === '-' || s === '—' || s === 'none' || s === 'n/a') {
+    return '-';
+  }
   if (s.includes('主婦') || s.includes('housewife') || s.includes('homemaker') || s.includes('গৃহিণী') || s.includes('house wife')) {
     return '専業主婦 / গৃহিণী';
   }
@@ -427,6 +430,15 @@ export function normalizeOccupation(val: any): string {
 export function normalizeFamilyAge(val: any): string {
   if (!val) return '';
   const s = String(val).trim();
+  if (
+    s.includes('死亡') ||
+    s.includes('মৃত') ||
+    s.toLowerCase().includes('deceased') ||
+    s.toLowerCase().includes('dead') ||
+    s.toLowerCase().includes('late')
+  ) {
+    return '死亡 / মৃত';
+  }
   const bnDigits: { [k: string]: string } = {
     '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4',
     '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9',
