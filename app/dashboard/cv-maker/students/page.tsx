@@ -149,14 +149,53 @@ export default function StudentListPage() {
     }
   }, []);
 
-  const handleMarkAsRead = (studentId: number) => {
+  const handleMarkAsRead = async (studentId: number) => {
+    // 1. Optimistically update local students list
+    setStudents((prev) =>
+      prev.map((s) => (s.id === studentId ? { ...s, is_read: true } : s))
+    );
+    // 2. Clear from newlyArrivedIds Set & localStorage
     setNewlyArrivedIds((prev) => {
-      if (!prev.has(studentId)) return prev;
       const next = new Set(prev);
       next.delete(studentId);
       persistNewIds(next);
       return next;
     });
+    // 3. Persist read status to database in background
+    try {
+      await fetch(`/api/cv-maker/students/${studentId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_read: true }),
+      });
+    } catch (err) {
+      console.error('Failed to mark student as read:', err);
+    }
+  };
+
+  const handleToggleRead = async (studentId: number, makeRead: boolean) => {
+    setStudents((prev) =>
+      prev.map((s) => (s.id === studentId ? { ...s, is_read: makeRead } : s))
+    );
+    setNewlyArrivedIds((prev) => {
+      const next = new Set(prev);
+      if (makeRead) {
+        next.delete(studentId);
+      } else {
+        next.add(studentId);
+      }
+      persistNewIds(next);
+      return next;
+    });
+    try {
+      await fetch(`/api/cv-maker/students/${studentId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_read: makeRead }),
+      });
+    } catch (err) {
+      console.error('Failed to toggle student read state:', err);
+    }
   };
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -199,6 +238,11 @@ export default function StudentListPage() {
   const printVersion: 'japanese' | 'student' = aiEnabled ? selectedPrintVersion : 'student';
   const effectivePrintVersion = printVersion;
   const setPrintVersion = setSelectedPrintVersion;
+
+  // Real-time unread application count (checks DB is_read and real-time state)
+  const unreadCount = students.filter(
+    (s) => s.is_read === false || (s as any).is_read === 0 || newlyArrivedIds.has(s.id)
+  ).length;
 
   // Target element ref for clean, pixel-perfect A4 printing
   const cvPrintRef = useRef<HTMLDivElement>(null);
@@ -463,13 +507,14 @@ export default function StudentListPage() {
 
           if (isFirstLoadRef.current) {
             isFirstLoadRef.current = false;
-            // Validate stored unread IDs against fresh database records
+            // Validate stored unread IDs against fresh database records + include DB unread records
             const stored = loadStoredNewIds();
+            const unreadDbIds = freshStudents
+              .filter((s) => s.is_read === false || (s as any).is_read === 0)
+              .map((s) => s.id);
             const freshIds = new Set(freshStudents.map((s) => s.id));
-            const valid = new Set([...stored].filter((id) => freshIds.has(id)));
-            if (valid.size !== stored.size) {
-              persistNewIds(valid);
-            }
+            const valid = new Set([...stored, ...unreadDbIds].filter((id) => freshIds.has(id)));
+            persistNewIds(valid);
             setNewlyArrivedIds(valid);
           }
 
@@ -673,6 +718,37 @@ export default function StudentListPage() {
                 <RefreshCw size={11} className="animate-spin" style={{ color: '#059669', marginLeft: '2px' }} />
               )}
             </div>
+
+            {unreadCount > 0 && (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  backgroundColor: '#f0fdf4',
+                  border: '1px solid #86efac',
+                  borderRadius: '20px',
+                  padding: '4px 12px',
+                  fontSize: '11.5px',
+                  fontWeight: 800,
+                  color: '#15803d',
+                  boxShadow: '0 1px 3px rgba(22, 101, 52, 0.08)',
+                }}
+                title={`${unreadCount} new unread application(s)`}
+              >
+                <span
+                  style={{
+                    width: '7px',
+                    height: '7px',
+                    borderRadius: '50%',
+                    backgroundColor: '#16a34a',
+                    display: 'inline-block',
+                    animation: 'pulseNewDot 1.2s infinite ease-in-out',
+                  }}
+                />
+                <span>{unreadCount} New Application{unreadCount > 1 ? 's' : ''}</span>
+              </div>
+            )}
           </div>
           <p>
             View and manage all student submissions received via shareable form links and direct admin intake in real-time.
@@ -900,6 +976,11 @@ export default function StudentListPage() {
               title="Filter by Status"
             >
               <option value="">All Statuses</option>
+              {unreadCount > 0 && (
+                <option value="unread" style={{ fontWeight: 700, color: '#15803d' }}>
+                  ★ New / Unread ({unreadCount})
+                </option>
+              )}
               <option value="draft">Draft</option>
               <option value="submitted">Submitted</option>
               <option value="verified">Verified</option>
@@ -989,7 +1070,10 @@ export default function StudentListPage() {
                 </tr>
               ) : (
                 students.map((student) => {
-                  const isNewlyArrived = newlyArrivedIds.has(student.id);
+                  const isNewlyArrived =
+                    student.is_read === false ||
+                    (student as any).is_read === 0 ||
+                    newlyArrivedIds.has(student.id);
                   const details = student.details_json || {};
                   const photoSrc = details.photo_data || null;
                   const furiganaVal = details.furigana || student.full_name;
@@ -1202,6 +1286,24 @@ export default function StudentListPage() {
                               )}
                             </button>
                           )}
+
+                          <button
+                            type="button"
+                            onClick={() => handleToggleRead(student.id, isNewlyArrived)}
+                            className={styles.secondaryBtn}
+                            title={isNewlyArrived ? 'Mark application as read' : 'Mark application as unread (highlight as new)'}
+                            style={{
+                              padding: '6px 10px',
+                              color: isNewlyArrived ? '#059669' : '#64748b',
+                              borderColor: isNewlyArrived ? '#86efac' : undefined,
+                              backgroundColor: isNewlyArrived ? '#f0fdf4' : undefined,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            <Mail size={13} />
+                          </button>
 
                           <button
                             type="button"

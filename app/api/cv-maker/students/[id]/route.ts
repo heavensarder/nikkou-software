@@ -52,6 +52,7 @@ export async function GET(
 
     // Normalize date_of_birth to literal 'YYYY-MM-DD' string or null (never placeholder like '—')
     student.date_of_birth = sanitizeDbDate(student.date_of_birth) || sanitizeDbDate(student.details_json?.dob_japanese) || null;
+    student.is_read = Boolean(student.is_read);
 
     return NextResponse.json({ success: true, student });
   } catch (error: any) {
@@ -176,7 +177,7 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await request.json();
-    const { status } = body;
+    const { status, is_read } = body;
 
     if (status) {
       const allowed = ['draft', 'submitted', 'verified', 'inactive'];
@@ -189,7 +190,14 @@ export async function PATCH(
       );
     }
 
-    return NextResponse.json({ success: true, message: 'Status updated successfully' });
+    if (typeof is_read === 'boolean') {
+      await query<ResultSetHeader>(
+        'UPDATE student_cvs SET is_read = ? WHERE id = ?',
+        [is_read ? 1 : 0, Number(id)]
+      );
+    }
+
+    return NextResponse.json({ success: true, message: 'Updated successfully' });
   } catch (error: any) {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }

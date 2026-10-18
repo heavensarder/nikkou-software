@@ -884,6 +884,15 @@ function CreateNewCvContent() {
       // Immediately clear storage and reset React state so next form is completely clean
       resetForm(true);
 
+      if (data.student?.id && typeof window !== 'undefined') {
+        try {
+          const raw = localStorage.getItem('nikkou_new_application_ids');
+          const existing = raw ? JSON.parse(raw) : [];
+          const updated = Array.from(new Set([...existing, Number(data.student.id)]));
+          localStorage.setItem('nikkou_new_application_ids', JSON.stringify(updated));
+        } catch {}
+      }
+
       setSuccessMsg(`Student CV created successfully! Reference Code: ${data.student.student_code}`);
       setTimeout(() => {
         router.push('/dashboard/cv-maker/students');

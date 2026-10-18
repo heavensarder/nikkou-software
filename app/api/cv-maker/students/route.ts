@@ -64,8 +64,12 @@ export async function GET(request: NextRequest) {
     }
 
     if (status) {
-      sql += ` AND s.status = ?`;
-      params.push(status);
+      if (status === 'unread') {
+        sql += ` AND s.is_read = 0`;
+      } else {
+        sql += ` AND s.status = ?`;
+        params.push(status);
+      }
     }
 
     if (formId) {
@@ -115,6 +119,7 @@ export async function GET(request: NextRequest) {
 
       return {
         ...s,
+        is_read: Boolean(s.is_read),
         date_of_birth: dobStr,
         program: s.program || details?.program || null,
         sub_program: s.sub_program || details?.sub_program || null,

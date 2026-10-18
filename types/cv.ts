@@ -57,6 +57,7 @@ export interface StudentCv {
   program?: string | null;
   sub_program?: string | null;
   status: 'draft' | 'submitted' | 'verified' | 'inactive';
+  is_read?: boolean;
   details_json: {
     program?: string | null;
     sub_program?: string | null;
