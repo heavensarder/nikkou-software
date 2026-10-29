@@ -145,10 +145,12 @@ IMPORTANT EXTRACTION PRINCIPLES:
      "JLPT N4 / জাপানি N4"
      "JLPT N3 / জাপানি N3"
      "JFT-Basic / জেএফটি-বেসিক"
+     "専門学校/Diploma"
      (Or specific major/field name if technical/vocational)
    - education_history.qualification:
      "中学校卒業 / মাধ্যমিক পাস (SSC)" (SSC / Secondary / Dakhil)
      "高校卒業 / উচ্চ মাধ্যমিক পাস (HSC)" (HSC / Higher Secondary / Alim)
+     "専門学校/Diploma" (Diploma / Polytechnic / Vocational / 専門学校)
      "大学卒業 / স্নাতক (Honours / Bachelor)" (Degree / Honours / B.Sc / B.A / B.Com / BBA)
      "大学院修了 / স্নাতকোত্তর (Master's)" (Master's / M.Sc / M.A / MBA)
      "日本語 / জাপানি ভাষা (JLPT / NAT)" (Japanese Language Course)

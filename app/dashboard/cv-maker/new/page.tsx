@@ -21,7 +21,7 @@ import ProgramCategorySection from '@/components/ProgramCategorySection';
 import EducationHistorySection, { INITIAL_EDUCATION_ROWS } from '@/components/EducationHistorySection';
 import WorkHistorySection, { INITIAL_WORK_ROWS } from '@/components/WorkHistorySection';
 import FamilyInfoSection, { INITIAL_FAMILY_ROWS } from '@/components/FamilyInfoSection';
-import { EducationEntry, WorkExperienceEntry, FamilyMemberEntry, EYESIGHT_OPTIONS } from '@/types/cv';
+import { EducationEntry, WorkExperienceEntry, FamilyMemberEntry, EYESIGHT_OPTIONS, TARGET_SAVINGS_OPTIONS, PERSONAL_INCOME_OPTIONS } from '@/types/cv';
 import AiDocumentFillModal from '@/components/AiDocumentFillModal';
 import EyesightField from '@/components/EyesightField';
 import TranslatableTextarea from '@/components/TranslatableTextarea';
@@ -45,6 +45,8 @@ import {
   normalizeJapaneseYearMonth,
   formatJapaneseBirthDate,
   formatReadableBirthDate,
+  normalizeTargetSavings,
+  normalizePersonalIncome,
 } from '@/lib/cv-normalizer';
 import styles from '../cv-maker.module.css';
 export { formatJapaneseBirthDate };
@@ -208,8 +210,8 @@ function CreateNewCvContent() {
     if (data.group_living !== undefined && data.group_living !== null && data.group_living !== '') {
       setGroupLiving(normalizeYesNo(data.group_living, true));
     }
-    if (data.personal_income) setPersonalIncome(data.personal_income);
-    if (data.target_savings_5years) setTargetSavings5Years(data.target_savings_5years);
+    if (data.personal_income) setPersonalIncome(normalizePersonalIncome(data.personal_income));
+    if (data.target_savings_5years) setTargetSavings5Years(normalizeTargetSavings(data.target_savings_5years));
     if (data.motivation) setMotivation(data.motivation);
     if (data.future_plan_after_japan) setFuturePlanAfterJapan(data.future_plan_after_japan);
     if (data.japan_visa_applied_before !== undefined && data.japan_visa_applied_before !== null && data.japan_visa_applied_before !== '') {
@@ -711,8 +713,8 @@ function CreateNewCvContent() {
     setCooking('有 / হ্যাঁ');
     setGroupLiving('有 / হ্যাঁ');
     setMedicalHistory('無 / না');
-    setPersonalIncome('2 万円 / ইয়েন');
-    setTargetSavings5Years('350万円 / ৩৫লক্ষ ইয়েন');
+    setPersonalIncome('0万円 / 0 লক্ষ ইয়েন');
+    setTargetSavings5Years('350万円 / 35লক্ষ ইয়েন');
     setMotivation('日本の先進的な技術と高い労働倫理を学び、将来のキャリアを発展させたいと考えております。');
     setMotivationOriginalBn('জাপানের উন্নত প্রযুক্তি ও কাজের নীতি শিখে নিজের ক্যারিয়ার উন্নত করতে চাই।');
     setFuturePlanAfterJapan('日本で培った技術とマネジメント経験を活かし、バングラデシュで技術指導や独立起業を目指します。');
@@ -1927,11 +1929,9 @@ function CreateNewCvContent() {
                 <label style={{ display: 'block', fontSize: '13.5px', fontWeight: 700, color: 'var(--nikkou-navy)', marginBottom: '6px' }}>
                   個人収入 / ব্যক্তিগত আয়
                 </label>
-                <input
-                  type="text"
+                <select
                   value={personalIncome}
                   onChange={(e) => setPersonalIncome(e.target.value)}
-                  placeholder="例: 0 万円 / ইয়েন"
                   style={{
                     width: '100%',
                     height: '44px',
@@ -1939,21 +1939,28 @@ function CreateNewCvContent() {
                     borderRadius: '8px',
                     border: '1.5px solid var(--border-light)',
                     fontSize: '14px',
-                    color: 'var(--text-primary)',
+                    color: personalIncome ? 'var(--text-primary)' : '#94a3b8',
+                    background: '#ffffff',
                     outline: 'none',
                   }}
-                />
+                >
+                  <option value="">選択してください / নির্বাচন করুন</option>
+                  {personalIncome && !PERSONAL_INCOME_OPTIONS.includes(personalIncome as any) && (
+                    <option value={personalIncome}>{personalIncome}</option>
+                  )}
+                  {PERSONAL_INCOME_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
               </div>
 
               <div>
                 <label style={{ display: 'block', fontSize: '13.5px', fontWeight: 700, color: 'var(--nikkou-navy)', marginBottom: '6px' }}>
                   5年貯金目標 / 5বছরে সঞ্চয় ইচ্ছা
                 </label>
-                <input
-                  type="text"
+                <select
                   value={targetSavings5Years}
                   onChange={(e) => setTargetSavings5Years(e.target.value)}
-                  placeholder="例: 300万円 / 30লক্ষ ইয়েন"
                   style={{
                     width: '100%',
                     height: '44px',
@@ -1961,10 +1968,19 @@ function CreateNewCvContent() {
                     borderRadius: '8px',
                     border: '1.5px solid var(--border-light)',
                     fontSize: '14px',
-                    color: 'var(--text-primary)',
+                    color: targetSavings5Years ? 'var(--text-primary)' : '#94a3b8',
+                    background: '#ffffff',
                     outline: 'none',
                   }}
-                />
+                >
+                  <option value="">選択してください / নির্বাচন করুন</option>
+                  {targetSavings5Years && !TARGET_SAVINGS_OPTIONS.includes(targetSavings5Years as any) && (
+                    <option value={targetSavings5Years}>{targetSavings5Years}</option>
+                  )}
+                  {TARGET_SAVINGS_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
               </div>
             </div>
 

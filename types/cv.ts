@@ -184,3 +184,33 @@ export function formatEyesight(right: string, left: string): string {
   if (!r && l) return `右: ${l} 左: ${l}`;
   return `右: ${r} 左: ${l}`;
 }
+
+export const TARGET_SAVINGS_OPTIONS = [
+  '100万円 / 10লক্ষ ইয়েন',
+  '150万円 / 15লক্ষ ইয়েন',
+  '200万円 / 20লক্ষ ইয়েন',
+  '250万円 / 25লক্ষ ইয়েন',
+  '300万円 / 30লক্ষ ইয়েন',
+  '350万円 / 35লক্ষ ইয়েন',
+  '400万円 / 40লক্ষ ইয়েন',
+  '450万円 / 45লক্ষ ইয়েন',
+  '500万円 / 50লক্ষ ইয়েন',
+] as const;
+
+export type TargetSavingsOption = (typeof TARGET_SAVINGS_OPTIONS)[number];
+
+export const PERSONAL_INCOME_OPTIONS = [
+  '0万円 / 0 লক্ষ ইয়েন',
+  '10万円 / 1লক্ষ ইয়েন',
+  '20万円 / 2লক্ষ ইয়েন',
+  '30万円 / 3লক্ষ ইয়েন',
+  '40万円 / 4লক্ষ ইয়েন',
+  '50万円 / 5লক্ষ ইয়েন',
+  '60万円 / 6লক্ষ ইয়েন',
+  '70万円 / 7লক্ষ ইয়েন',
+  '80万円 / 8লক্ষ ইয়েন',
+  '90万円 / 9লক্ষ ইয়েন',
+  '100万円 / 10লক্ষ ইয়েন',
+] as const;
+
+export type PersonalIncomeOption = (typeof PERSONAL_INCOME_OPTIONS)[number];

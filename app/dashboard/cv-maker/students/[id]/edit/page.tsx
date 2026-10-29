@@ -23,7 +23,7 @@ import ProgramCategorySection from '@/components/ProgramCategorySection';
 import EducationHistorySection, { INITIAL_EDUCATION_ROWS } from '@/components/EducationHistorySection';
 import WorkHistorySection, { INITIAL_WORK_ROWS } from '@/components/WorkHistorySection';
 import FamilyInfoSection, { INITIAL_FAMILY_ROWS } from '@/components/FamilyInfoSection';
-import { EducationEntry, WorkExperienceEntry, FamilyMemberEntry, EYESIGHT_OPTIONS } from '@/types/cv';
+import { EducationEntry, WorkExperienceEntry, FamilyMemberEntry, EYESIGHT_OPTIONS, TARGET_SAVINGS_OPTIONS, PERSONAL_INCOME_OPTIONS } from '@/types/cv';
 import EyesightField from '@/components/EyesightField';
 import TranslatableTextarea from '@/components/TranslatableTextarea';
 import styles from '../../../cv-maker.module.css';
@@ -1508,13 +1508,19 @@ function EditStudentCvContent() {
                 <label style={{ display: 'block', fontSize: '13.5px', fontWeight: 700, color: 'var(--nikkou-navy)', marginBottom: '8px' }}>
                   個人収入 / ব্যক্তিগত আয়
                 </label>
-                <input
-                  type="text"
+                <select
                   value={personalIncome}
                   onChange={(e) => setPersonalIncome(e.target.value)}
-                  placeholder="2 万円 / ইয়েন"
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid var(--border-light)', fontSize: '14px', fontWeight: 600 }}
-                />
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid var(--border-light)', fontSize: '14px', fontWeight: 600, background: '#fff' }}
+                >
+                  <option value="">選択してください / নির্বাচন করুন</option>
+                  {personalIncome && !PERSONAL_INCOME_OPTIONS.includes(personalIncome as any) && (
+                    <option value={personalIncome}>{personalIncome}</option>
+                  )}
+                  {PERSONAL_INCOME_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
               </div>
 
               {/* 5-Year Savings Target */}
@@ -1522,13 +1528,19 @@ function EditStudentCvContent() {
                 <label style={{ display: 'block', fontSize: '13.5px', fontWeight: 700, color: 'var(--nikkou-navy)', marginBottom: '8px' }}>
                   5年貯金目標 / 5বছরে সঞ্চয় ইচ্ছা
                 </label>
-                <input
-                  type="text"
+                <select
                   value={targetSavings5Years}
                   onChange={(e) => setTargetSavings5Years(e.target.value)}
-                  placeholder="300万円 / ৩০লক্ষ ইয়েন"
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid var(--border-light)', fontSize: '14px', fontWeight: 600 }}
-                />
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid var(--border-light)', fontSize: '14px', fontWeight: 600, background: '#fff' }}
+                >
+                  <option value="">選択してください / নির্বাচন করুন</option>
+                  {targetSavings5Years && !TARGET_SAVINGS_OPTIONS.includes(targetSavings5Years as any) && (
+                    <option value={targetSavings5Years}>{targetSavings5Years}</option>
+                  )}
+                  {TARGET_SAVINGS_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
               </div>
 
               {/* Japan Visa Applied Before */}

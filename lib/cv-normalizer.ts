@@ -215,6 +215,9 @@ export function normalizeJapanVisaType(val: any): string {
 export function normalizeEducationSubject(val: any): string {
   if (!val) return '';
   const s = String(val).toLowerCase().trim();
+  if (s.includes('専門学校') || s.includes('diploma') || s.includes('ডিপ্লোমা')) {
+    return '専門学校/Diploma';
+  }
   if (s.includes('科学') || s.includes('science') || s.includes('বিজ্ঞান') || s.includes('scince')) {
     return '科学系 / বিজ্ঞান বিভাগ';
   }
@@ -242,6 +245,9 @@ export function normalizeEducationSubject(val: any): string {
 export function normalizeQualification(val: any): string {
   if (!val) return '';
   const s = String(val).toLowerCase().trim();
+  if (s.includes('専門学校') || s.includes('diploma') || s.includes('ডিপ্লোমা')) {
+    return '専門学校/Diploma';
+  }
   if (
     s.includes('ssc') ||
     s.includes('secondary school certificate') ||
@@ -759,4 +765,67 @@ export function formatReadableBirthDate(dateStr: string | null | undefined): str
   const dayNum = parseInt(day, 10);
 
   return `${dayNum} ${enM} ${year} (${toBengaliNumber(dayNum)} ${bnM} ${toBengaliNumber(year)})`;
+}
+
+export { TARGET_SAVINGS_OPTIONS, PERSONAL_INCOME_OPTIONS } from '@/types/cv';
+import { TARGET_SAVINGS_OPTIONS, PERSONAL_INCOME_OPTIONS } from '@/types/cv';
+
+export function normalizeTargetSavings(val: any): string {
+  if (!val) return '';
+  const s = String(val).trim();
+  const exact = TARGET_SAVINGS_OPTIONS.find((opt) => opt.toLowerCase() === s.toLowerCase());
+  if (exact) return exact;
+
+  const match = s.match(/(\d+)\s*万/);
+  if (match) {
+    const manYen = parseInt(match[1], 10);
+    const found = TARGET_SAVINGS_OPTIONS.find((opt) => opt.startsWith(`${manYen}万円`));
+    if (found) return found;
+  }
+
+  const lakhMatch = s.match(/(\d+)\s*লক্ষ/);
+  if (lakhMatch) {
+    const lakh = parseInt(lakhMatch[1], 10);
+    const manYen = lakh * 10;
+    const found = TARGET_SAVINGS_OPTIONS.find((opt) => opt.startsWith(`${manYen}万円`));
+    if (found) return found;
+  }
+
+  return s;
+}
+
+export function normalizePersonalIncome(val: any): string {
+  if (val === null || val === undefined || val === '') return '';
+  const s = String(val).trim();
+  const exact = PERSONAL_INCOME_OPTIONS.find((opt) => opt.toLowerCase() === s.toLowerCase());
+  if (exact) return exact;
+
+  if (
+    s === '0' ||
+    s === '0円' ||
+    s.includes('0万円') ||
+    s.includes('0 万円') ||
+    s.includes('০ লক্ষ') ||
+    s.includes('0লক্ষ') ||
+    s.includes('0 লক্ষ')
+  ) {
+    return PERSONAL_INCOME_OPTIONS[0];
+  }
+
+  const match = s.match(/(\d+)\s*万/);
+  if (match) {
+    const manYen = parseInt(match[1], 10);
+    const found = PERSONAL_INCOME_OPTIONS.find((opt) => opt.startsWith(`${manYen}万円`));
+    if (found) return found;
+  }
+
+  const lakhMatch = s.match(/(\d+)\s*লক্ষ/);
+  if (lakhMatch) {
+    const lakh = parseInt(lakhMatch[1], 10);
+    const manYen = lakh * 10;
+    const found = PERSONAL_INCOME_OPTIONS.find((opt) => opt.startsWith(`${manYen}万円`));
+    if (found) return found;
+  }
+
+  return s;
 }

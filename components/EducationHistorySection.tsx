@@ -45,12 +45,16 @@ export const SUBJECT_OPTIONS = [
   'JLPT N4 / জাপানি N4',
   'JLPT N3 / জাপানি N3',
   'JFT-Basic / জেএফটি-বেসিক',
+  '専門学校/Diploma',
 ];
 
 export function normalizeSubject(val: string | null | undefined): string {
   if (!val) return '';
   const trimmed = String(val).trim();
   if (SUBJECT_OPTIONS.includes(trimmed)) return trimmed;
+  if (trimmed.includes('専門学校') || trimmed.toLowerCase().includes('diploma') || trimmed.includes('ডিপ্লোমা')) {
+    return '専門学校/Diploma';
+  }
   if (trimmed.includes('自然科学') || trimmed.includes('科学') || trimmed.includes('বিজ্ঞান')) {
     return '科学系 / বিজ্ঞান বিভাগ';
   }
@@ -70,6 +74,7 @@ export function normalizeSubject(val: string | null | undefined): string {
 export const QUALIFICATION_OPTIONS = [
   '中学校卒業 / মাধ্যমিক পাস (SSC)',
   '高校卒業 / উচ্চ মাধ্যমিক পাস (HSC)',
+  '専門学校/Diploma',
   '大学卒業 / স্নাতক (Honours / Bachelor)',
   '大学院修了 / স্নাতকোত্তর (Master\'s)',
   '日本語 / জাপানি ভাষা (JLPT / NAT)',
@@ -600,7 +605,9 @@ export default function EducationHistorySection({
                     value={
                       QUALIFICATION_OPTIONS.includes(entry.qualification)
                         ? entry.qualification
-                        : (entry.qualification ? 'その他 / অন্যান্য' : '')
+                        : (entry.qualification?.toLowerCase().includes('diploma') || entry.qualification?.includes('専門学校')
+                            ? '専門学校/Diploma'
+                            : (entry.qualification ? 'その他 / অন্যান্য' : ''))
                     }
                     onChange={(e) => handleFieldChange(idx, 'qualification', e.target.value)}
                     style={{

@@ -8,7 +8,7 @@ import ProgramCategorySection from '@/components/ProgramCategorySection';
 import EducationHistorySection, { INITIAL_EDUCATION_ROWS } from '@/components/EducationHistorySection';
 import WorkHistorySection, { INITIAL_WORK_ROWS } from '@/components/WorkHistorySection';
 import FamilyInfoSection, { INITIAL_FAMILY_ROWS } from '@/components/FamilyInfoSection';
-import { EducationEntry, WorkExperienceEntry, FamilyMemberEntry } from '@/types/cv';
+import { EducationEntry, WorkExperienceEntry, FamilyMemberEntry, TARGET_SAVINGS_OPTIONS, PERSONAL_INCOME_OPTIONS } from '@/types/cv';
 import {
   Send,
   CheckCircle2,
@@ -1105,26 +1105,40 @@ function StudentCvEditFormContent() {
                     <label className={styles.formLabel}>
                       個人収入 / ব্যক্তিগত আয়
                     </label>
-                    <input
-                      type="text"
+                    <select
                       value={personalIncome}
                       onChange={(e) => setPersonalIncome(e.target.value)}
-                      placeholder="例: 0 万円 / ইয়েন"
-                      className={styles.formInput}
-                    />
+                      className={styles.formSelect}
+                      style={{ color: personalIncome ? 'var(--text-primary)' : '#94a3b8' }}
+                    >
+                      <option value="">選択してください / নির্বাচন করুন</option>
+                      {personalIncome && !PERSONAL_INCOME_OPTIONS.includes(personalIncome as any) && (
+                        <option value={personalIncome}>{personalIncome}</option>
+                      )}
+                      {PERSONAL_INCOME_OPTIONS.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
                   </div>
 
                   <div className={styles.formField}>
                     <label className={styles.formLabel}>
-                      5年後の貯蓄目標 / ৫ বছরের সঞ্চয় লক্ষ্য
+                      5年貯金目標 / 5বছরে সঞ্চয় ইচ্ছা
                     </label>
-                    <input
-                      type="text"
+                    <select
                       value={targetSavings5Years}
                       onChange={(e) => setTargetSavings5Years(e.target.value)}
-                      placeholder="例: 600 万円 / ৬০ লক্ষ টাকা"
-                      className={styles.formInput}
-                    />
+                      className={styles.formSelect}
+                      style={{ color: targetSavings5Years ? 'var(--text-primary)' : '#94a3b8' }}
+                    >
+                      <option value="">選択してください / নির্বাচন করুন</option>
+                      {targetSavings5Years && !TARGET_SAVINGS_OPTIONS.includes(targetSavings5Years as any) && (
+                        <option value={targetSavings5Years}>{targetSavings5Years}</option>
+                      )}
+                      {TARGET_SAVINGS_OPTIONS.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 

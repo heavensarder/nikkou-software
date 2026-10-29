@@ -8,6 +8,15 @@ export function stripBengali(val: string | null | undefined): string {
   const trimmed = String(val).trim();
   if (!trimmed) return '';
 
+  // 0. If 専門学校/Diploma or Diploma
+  if (
+    trimmed === '専門学校/Diploma' ||
+    trimmed === '専門学校 / Diploma' ||
+    trimmed.toLowerCase() === 'diploma'
+  ) {
+    return '専門学校';
+  }
+
   // 1. If split by " / "
   if (trimmed.includes(' / ')) {
     const parts = trimmed.split(' / ');
@@ -79,7 +88,7 @@ export function formatPureJapaneseAge(val: string | null | undefined, dob?: any)
 }
 
 /**
- * Formats pure Japanese savings e.g. "350万円 / ৩৫লক্ষ ইয়েন" -> "350万円"
+ * Formats pure Japanese savings e.g. "350万円 / 35লক্ষ ইয়েন" -> "350万円"
  */
 export function formatPureJapaneseSavings(val: string | null | undefined): string {
   if (!val) return '—';
@@ -87,14 +96,14 @@ export function formatPureJapaneseSavings(val: string | null | undefined): strin
   if (!str) return '—';
 
   if (str.includes(' / ')) {
-    return str.split(' / ')[0].trim();
+    return str.split(' / ')[0].trim().replace(/\s+/g, '');
   }
-  const clean = str.replace(/[\u0980-\u09FF]+/g, '').trim();
+  const clean = str.replace(/[\u0980-\u09FF]+/g, '').trim().replace(/\s+/g, '');
   return clean || str;
 }
 
 /**
- * Formats pure Japanese income e.g. "2 万円 / ইয়েন" -> "2万円"
+ * Formats pure Japanese income e.g. "2 万円 / ইয়েন" -> "2万円", "0万円 / 0 লক্ষ ইয়েন" -> "0万円"
  */
 export function formatPureJapaneseIncome(val: string | null | undefined): string {
   if (!val) return '—';
@@ -102,10 +111,38 @@ export function formatPureJapaneseIncome(val: string | null | undefined): string
   if (!str) return '—';
 
   if (str.includes(' / ')) {
-    return str.split(' / ')[0].trim();
+    return str.split(' / ')[0].trim().replace(/\s+/g, '');
   }
-  const clean = str.replace(/[\u0980-\u09FF]+/g, '').trim();
+  const clean = str.replace(/[\u0980-\u09FF]+/g, '').trim().replace(/\s+/g, '');
   return clean || str;
+}
+
+/**
+ * Formats 5-year savings field for Japanese vs Student versions
+ */
+export function formatSavingsField(
+  val: string | null | undefined,
+  version: 'japanese' | 'student'
+): string {
+  if (!val) return '—';
+  if (version === 'japanese') {
+    return formatPureJapaneseSavings(val);
+  }
+  return val;
+}
+
+/**
+ * Formats personal income field for Japanese vs Student versions
+ */
+export function formatIncomeField(
+  val: string | null | undefined,
+  version: 'japanese' | 'student'
+): string {
+  if (!val) return '—';
+  if (version === 'japanese') {
+    return formatPureJapaneseIncome(val);
+  }
+  return val;
 }
 
 /**
@@ -121,6 +158,35 @@ export function formatPureJapaneseLanguage(val: string | null | undefined): stri
   if (str.includes('可') || str.includes('出来る')) return '可';
 
   return stripBengali(str) || '—';
+}
+
+/**
+ * Formats education major_subject and qualification fields:
+ * - In 'student' version: displays "専門学校/Diploma" (or original bilingual string)
+ * - In 'japanese' version: displays "専門学校" (stripping Bengali/English annotations)
+ */
+export function formatEducationField(
+  val: string | null | undefined,
+  version: 'japanese' | 'student'
+): string {
+  if (!val) return '—';
+  const trimmed = String(val).trim();
+  if (!trimmed) return '—';
+
+  if (
+    trimmed === '専門学校/Diploma' ||
+    trimmed === '専門学校 / Diploma' ||
+    trimmed.toLowerCase() === 'diploma' ||
+    trimmed === '専門学校'
+  ) {
+    return version === 'japanese' ? '専門学校' : '専門学校/Diploma';
+  }
+
+  if (version === 'japanese') {
+    return stripBengali(trimmed) || '—';
+  } else {
+    return trimmed || '—';
+  }
 }
 
 /**
@@ -171,4 +237,3 @@ export function getExportPdfFileName(
   const cleanName = rawName.replace(/[/\\?%*:|"<>]/g, '').trim() || 'CV';
   return version === 'student' ? `${cleanName}_sv` : cleanName;
 }
-

@@ -38,6 +38,7 @@ import {
   formatPureJapaneseIncome,
   formatPureJapaneseLanguage,
   formatCvFieldValue,
+  formatEducationField,
   getExportPdfFileName,
 } from '@/lib/cv-pure-japanese';
 export { formatJapaneseBirthDate, formatLanguageDisplay };
@@ -2601,10 +2602,10 @@ export default function StudentListPage() {
                                 {edu.school_name || '—'}
                               </td>
                               <td style={{ padding: '4px 6px', textAlign: 'center', fontWeight: 600, color: '#000000', borderRight: '1px solid #2b5585', fontSize: '11.5px', wordBreak: 'break-word' }}>
-                                {printVersion === 'japanese' ? stripBengali(edu.major_subject) || '—' : (edu.major_subject || '—')}
+                                {formatEducationField(edu.major_subject, printVersion)}
                               </td>
                               <td style={{ padding: '4px 6px', textAlign: 'center', fontWeight: 600, color: '#000000', fontSize: '11.5px', wordBreak: 'break-word' }}>
-                                {printVersion === 'japanese' ? stripBengali(edu.qualification) || '—' : (edu.qualification || '—')}
+                                {formatEducationField(edu.qualification, printVersion)}
                               </td>
                             </tr>
                           ))
