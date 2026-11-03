@@ -199,29 +199,6 @@ export default function WorkHistorySection({
             職歴 / কাজের ইতিহাস
           </h2>
         </div>
-
-        <button
-          type="button"
-          onClick={handleAddRow}
-          disabled={disabled}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '7px 14px',
-            background: '#fff',
-            border: '1.5px solid var(--nikkou-navy)',
-            borderRadius: '8px',
-            color: 'var(--nikkou-navy)',
-            fontSize: '13px',
-            fontWeight: 700,
-            cursor: disabled ? 'not-allowed' : 'pointer',
-            transition: 'all 0.2s ease',
-          }}
-        >
-          <Plus size={15} />
-          <span>行を追加 / আরও যোগ করুন</span>
-        </button>
       </div>
 
       <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
@@ -654,6 +631,31 @@ export default function WorkHistorySection({
             </div>
           );
         })}
+      </div>
+
+      <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-start' }}>
+        <button
+          type="button"
+          onClick={handleAddRow}
+          disabled={disabled}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '8px 16px',
+            background: '#fff',
+            border: '1.5px solid var(--nikkou-navy)',
+            borderRadius: '8px',
+            color: 'var(--nikkou-navy)',
+            fontSize: '13px',
+            fontWeight: 700,
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            transition: 'all 0.2s ease',
+          }}
+        >
+          <Plus size={15} />
+          <span>行を追加 / আরও যোগ করুন</span>
+        </button>
       </div>
     </div>
   );
