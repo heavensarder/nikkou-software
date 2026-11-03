@@ -1340,13 +1340,13 @@ function CreateNewCvContent() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '18px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '13.5px', fontWeight: 700, color: 'var(--nikkou-navy)', marginBottom: '6px' }}>
-                  フリガナ / ফুরিগানা
+                  フリガナ / ফুরিগানা (Furigana)
                 </label>
                 <input
                   type="text"
                   value={furigana}
-                  onChange={(e) => setFurigana(e.target.value.toUpperCase())}
-                  placeholder="Full Name"
+                  onChange={(e) => setFurigana(e.target.value)}
+                  placeholder="ジョン ドゥ"
                   style={{
                     width: '100%',
                     height: '44px',
@@ -1356,11 +1356,10 @@ function CreateNewCvContent() {
                     fontSize: '14px',
                     color: 'var(--text-primary)',
                     outline: 'none',
-                    textTransform: 'uppercase',
                   }}
                 />
                 <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-                  カタカナ・氏名 / কাতাকানা বা পূর্ণ নাম
+                  カタカナ・フリガナ / কাতাকানা (ফুরিগানা)
                 </span>
               </div>
 
@@ -1400,7 +1399,7 @@ function CreateNewCvContent() {
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Full Name"
+                  placeholder="JOHN DOE"
                   style={{
                     width: '100%',
                     height: '44px',
@@ -1413,7 +1412,7 @@ function CreateNewCvContent() {
                   }}
                 />
                 <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-                  JOHN DOE / ইংরেজি তে পূর্ণ নাম
+                  パスポート通りの英語表記 / পাসপোর্ট অনুযায়ী ইংরেজি নাম
                 </span>
               </div>
 

@@ -988,13 +988,13 @@ function EditStudentCvContent() {
                     marginBottom: '8px',
                   }}
                 >
-                  フリガナ / ফুরিগানা
+                  フリガナ / ফুরিগানা (Furigana)
                 </label>
                 <input
                   type="text"
                   value={furigana}
-                  onChange={(e) => setFurigana(e.target.value.toUpperCase())}
-                  placeholder="MD TARIQUL ISLAM"
+                  onChange={(e) => setFurigana(e.target.value)}
+                  placeholder="ジョン ドゥ"
                   style={{
                     width: '100%',
                     padding: '10px 14px',
@@ -1006,6 +1006,9 @@ function EditStudentCvContent() {
                     fontWeight: 600,
                   }}
                 />
+                <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                  カタカナ・フリガナ / কাতাকানা (ফুরিগানা)
+                </span>
               </div>
 
               {/* Native Name */}
@@ -1019,13 +1022,13 @@ function EditStudentCvContent() {
                     marginBottom: '8px',
                   }}
                 >
-                  氏名 / নাম (In English) (পূর্ণ নাম)
+                  氏名 / নাম (In English)
                 </label>
                 <input
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="MD TARIQUL ISLAM / তারিকুল ইসলাম"
+                  placeholder="JOHN DOE"
                   style={{
                     width: '100%',
                     padding: '10px 14px',
@@ -1037,6 +1040,9 @@ function EditStudentCvContent() {
                     fontWeight: 600,
                   }}
                 />
+                <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                  パスポート通りの英語表記 / পাসপোর্ট অনুযায়ী ইংরেজি নাম
+                </span>
               </div>
 
               {/* Gender */}

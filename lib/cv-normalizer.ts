@@ -29,11 +29,21 @@ export function normalizeGender(val: any): string {
 export function normalizeMaritalStatus(val: any): string {
   if (!val) return '';
   const s = String(val).toLowerCase().trim();
-  if (s.includes('既婚') || s.includes('married') || s.includes('বিবাহিত')) {
-    return '既婚 / বিবাহিত';
-  }
-  if (s.includes('独身') || s.includes('single') || s.includes('unmarried') || s.includes('অবিবাহিত')) {
+  // Check unmarried / single first because "অবিবাহিত" contains "বিবাহিত" and "unmarried" contains "married"
+  if (
+    s.includes('独身') ||
+    s.includes('unmarried') ||
+    s.includes('অবিবাহিত') ||
+    s.includes('single')
+  ) {
     return '独身 / অবিবাহিত';
+  }
+  if (
+    s.includes('既婚') ||
+    s.includes('married') ||
+    s.includes('বিবাহিত')
+  ) {
+    return '既婚 / বিবাহিত';
   }
   return '';
 }

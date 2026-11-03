@@ -1034,18 +1034,17 @@ export default function FixedStudentCvForm() {
               <div className={styles.grid2}>
                 <div className={styles.formField}>
                   <label className={styles.formLabel}>
-                    フリガナ / ফুরিগানা
+                    フリガナ / ফুরিগানা (Furigana)
                   </label>
                   <input
                     type="text"
                     value={furigana}
-                    onChange={(e) => setFurigana(e.target.value.toUpperCase())}
-                    placeholder="ジョン・ドゥ"
+                    onChange={(e) => setFurigana(e.target.value)}
+                    placeholder="ジョン ドゥ"
                     className={styles.formInput}
-                    style={{ textTransform: 'uppercase' }}
                   />
                   <span className={styles.formHelpText}>
-                    カタカナ・氏名 / JOHN DOE
+                    カタカナ・フリガナ / কাতাকানা (ফুরিগানা)
                   </span>
                 </div>
 
@@ -1080,7 +1079,7 @@ export default function FixedStudentCvForm() {
                     className={styles.formInput}
                   />
                   <span className={styles.formHelpText}>
-                    JOHN DOE / ইংরেজি বড় অক্ষরে
+                    パスポート通りの英語表記 / পাসপোর্ট অনুযায়ী ইংরেজি নাম
                   </span>
                 </div>
 
