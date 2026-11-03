@@ -1360,7 +1360,7 @@ function CreateNewCvContent() {
                   }}
                 />
                 <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-                  পাসপোর্ট অনুযায়ী নাম (ফুরিগানা)
+                  カタカナ・氏名 / কাতাকানা বা পূর্ণ নাম
                 </span>
               </div>
 
@@ -1413,7 +1413,7 @@ function CreateNewCvContent() {
                   }}
                 />
                 <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-                  カタカナ・氏名 / কাতাকানা বা পূর্ণ নাম
+                  JOHN DOE / ইংরেজি তে পূর্ণ নাম
                 </span>
               </div>
 
