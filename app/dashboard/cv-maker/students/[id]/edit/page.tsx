@@ -988,7 +988,7 @@ function EditStudentCvContent() {
                     marginBottom: '8px',
                   }}
                 >
-                  フリガナ / ফুরিগানা (নামের ইংরেজি ক্যাপিটাল)
+                  フリガナ / ফুরিগানা
                 </label>
                 <input
                   type="text"
