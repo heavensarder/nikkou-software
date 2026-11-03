@@ -1040,12 +1040,12 @@ export default function FixedStudentCvForm() {
                     type="text"
                     value={furigana}
                     onChange={(e) => setFurigana(e.target.value.toUpperCase())}
-                    placeholder="Full Name"
+                    placeholder="ジョン・ドゥ"
                     className={styles.formInput}
                     style={{ textTransform: 'uppercase' }}
                   />
                   <span className={styles.formHelpText}>
-                    পাসপোর্ট অনুযায়ী নাম (ফুরিগানা)
+                    カタカナ・氏名 / JOHN DOE
                   </span>
                 </div>
 
@@ -1076,11 +1076,11 @@ export default function FixedStudentCvForm() {
                     type="text"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Full Name"
+                    placeholder="JOHN DOE"
                     className={styles.formInput}
                   />
                   <span className={styles.formHelpText}>
-                    カタカナ・氏名 / কাতাকানা বা পূর্ণ নাম
+                    JOHN DOE / ইংরেজি বড় অক্ষরে
                   </span>
                 </div>
 
