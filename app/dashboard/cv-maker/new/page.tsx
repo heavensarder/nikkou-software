@@ -386,11 +386,11 @@ function CreateNewCvContent() {
                   // The student has already been submitted! This cached draft is stale and must be discarded.
                   try {
                     localStorage.removeItem('nikkou_admin_cv_new_draft');
-                  } catch {}
+                  } catch { }
                   resetForm(false);
                 }
               })
-              .catch(() => {});
+              .catch(() => { });
           }
 
           if (data.program !== undefined) setProgram(data.program);
@@ -892,7 +892,7 @@ function CreateNewCvContent() {
           const existing = raw ? JSON.parse(raw) : [];
           const updated = Array.from(new Set([...existing, Number(data.student.id)]));
           localStorage.setItem('nikkou_new_application_ids', JSON.stringify(updated));
-        } catch {}
+        } catch { }
       }
 
       setSuccessMsg(`Student CV created successfully! Reference Code: ${data.student.student_code}`);
@@ -1394,7 +1394,7 @@ function CreateNewCvContent() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '18px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '13.5px', fontWeight: 700, color: 'var(--nikkou-navy)', marginBottom: '6px' }}>
-                  氏名 / নাম
+                  氏名 / নাম (In English)
                 </label>
                 <input
                   type="text"

@@ -1019,7 +1019,7 @@ function EditStudentCvContent() {
                     marginBottom: '8px',
                   }}
                 >
-                  氏名 / নাম (পূর্ণ নাম)
+                  氏名 / নাম (In English) (পূর্ণ নাম)
                 </label>
                 <input
                   type="text"

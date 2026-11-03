@@ -724,7 +724,7 @@ function StudentCvEditFormContent() {
                 <div className={styles.grid2}>
                   <div className={styles.formField}>
                     <label className={styles.formLabel}>
-                      氏名 / নাম
+                      氏名 / নাম (In English)
                     </label>
                     <input
                       type="text"
