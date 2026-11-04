@@ -86,13 +86,27 @@ export async function GET(request: NextRequest) {
     }
 
     if (subProgram) {
-      if (subProgram.toLowerCase() === 'general crop farming') {
+      const sub = subProgram.toLowerCase();
+      if (sub === 'agriculture' || sub.includes('all')) {
         sql += ` AND (
-          LOWER(s.sub_program) IN (LOWER(?), 'agriculture')
-          OR LOWER(s.details_json->>'$.sub_program') IN (LOWER(?), 'agriculture')
-          OR LOWER(s.details_json->>'$.subProgram') IN (LOWER(?), 'agriculture')
+          LOWER(s.sub_program) LIKE '%agriculture%'
+          OR LOWER(s.details_json->>'$.sub_program') LIKE '%agriculture%'
+          OR LOWER(s.details_json->>'$.subProgram') LIKE '%agriculture%'
         )`;
-        params.push(subProgram, subProgram, subProgram);
+      } else if (sub.includes('crop')) {
+        sql += ` AND (
+          LOWER(s.sub_program) LIKE '%crop%'
+          OR LOWER(s.details_json->>'$.sub_program') LIKE '%crop%'
+          OR LOWER(s.details_json->>'$.subProgram') LIKE '%crop%'
+          OR LOWER(s.details_json->>'$.agriculture_type') LIKE '%crop%'
+        )`;
+      } else if (sub.includes('livestock')) {
+        sql += ` AND (
+          LOWER(s.sub_program) LIKE '%livestock%'
+          OR LOWER(s.details_json->>'$.sub_program') LIKE '%livestock%'
+          OR LOWER(s.details_json->>'$.subProgram') LIKE '%livestock%'
+          OR LOWER(s.details_json->>'$.agriculture_type') LIKE '%livestock%'
+        )`;
       } else {
         sql += ` AND (
           LOWER(s.sub_program) = LOWER(?)

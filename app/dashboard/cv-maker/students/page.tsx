@@ -950,19 +950,47 @@ export default function StudentListPage() {
                 {selectedProgram ? `All ${selectedProgram} Categories` : 'All Categories (সব বিভাগ)'}
               </option>
               {selectedProgram ? (
-                getSubPrograms(selectedProgram).map((sub) => (
-                  <option key={sub.id} value={sub.id}>
-                    {sub.label}
-                  </option>
-                ))
+                getSubPrograms(selectedProgram).flatMap((sub) => {
+                  if (sub.subOptions && sub.subOptions.length > 0) {
+                    return [
+                      <option key={sub.id} value={sub.id}>
+                        {sub.label} (All / সব কৃষি)
+                      </option>,
+                      ...sub.subOptions.map((opt) => (
+                        <option key={opt.id} value={opt.id}>
+                          &nbsp;&nbsp;↳ {opt.label} ({opt.labelJp})
+                        </option>
+                      )),
+                    ];
+                  }
+                  return (
+                    <option key={sub.id} value={sub.id}>
+                      {sub.label}
+                    </option>
+                  );
+                })
               ) : (
                 PROGRAM_OPTIONS.map((prog) => (
                   <optgroup key={prog.id} label={`${prog.label} (${prog.labelBn})`}>
-                    {prog.subPrograms.map((sub) => (
-                      <option key={`${prog.id}-${sub.id}`} value={sub.id}>
-                        {sub.label}
-                      </option>
-                    ))}
+                    {prog.subPrograms.flatMap((sub) => {
+                      if (sub.subOptions && sub.subOptions.length > 0) {
+                        return [
+                          <option key={`${prog.id}-${sub.id}`} value={sub.id}>
+                            {sub.label} (All)
+                          </option>,
+                          ...sub.subOptions.map((opt) => (
+                            <option key={`${prog.id}-${opt.id}`} value={opt.id}>
+                              &nbsp;&nbsp;↳ {opt.label} ({opt.labelJp})
+                            </option>
+                          )),
+                        ];
+                      }
+                      return (
+                        <option key={`${prog.id}-${sub.id}`} value={sub.id}>
+                          {sub.label}
+                        </option>
+                      );
+                    })}
                   </optgroup>
                 ))
               )}

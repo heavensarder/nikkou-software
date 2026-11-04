@@ -258,12 +258,27 @@ export default function ProgramCategorySection({
             }}
           >
             {currentSubPrograms.map((sub) => {
-              const isSelected = subProgram === sub.id || (program === 'SSW' && sub.id === 'General crop farming' && subProgram === 'Agriculture');
+              const hasSubOptions = Array.isArray(sub.subOptions) && sub.subOptions.length > 0;
+              const isSelected = hasSubOptions
+                ? (subProgram === sub.id || subProgram.startsWith(`${sub.id} - `) || subProgram.includes('Farming'))
+                : subProgram === sub.id;
+
+              const handleCategoryClick = () => {
+                if (isSelected) {
+                  onChangeSubProgram('');
+                } else if (hasSubOptions) {
+                  // Default to first sub-option (General Crop Farming) when clicking Agriculture
+                  onChangeSubProgram(sub.subOptions![0].id);
+                } else {
+                  onChangeSubProgram(sub.id);
+                }
+              };
+
               return (
                 <button
                   key={sub.id}
                   type="button"
-                  onClick={() => onChangeSubProgram(subProgram === sub.id ? '' : sub.id)}
+                  onClick={handleCategoryClick}
                   style={{
                     textAlign: 'left',
                     padding: '12px 14px',
@@ -314,6 +329,108 @@ export default function ProgramCategorySection({
               );
             })}
           </div>
+
+          {/* Nested Sub-options under SSW > Agriculture */}
+          {(() => {
+            const agriOption = currentSubPrograms.find((s) => s.id === 'Agriculture' && Array.isArray(s.subOptions));
+            const isAgriActive = agriOption && (
+              subProgram === 'Agriculture' ||
+              subProgram.startsWith('Agriculture - ') ||
+              subProgram.includes('Farming')
+            );
+
+            if (!isAgriActive || !agriOption || !agriOption.subOptions) return null;
+
+            return (
+              <div
+                style={{
+                  marginTop: '16px',
+                  padding: '16px',
+                  background: '#ffffff',
+                  borderRadius: '10px',
+                  border: '1.5px solid #fed7aa',
+                  boxShadow: '0 2px 8px rgba(234,88,12,0.06)',
+                  animation: 'fadeIn 0.2s ease',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '13.5px', fontWeight: 800, color: '#c2410c' }}>
+                    🌾 農業の作業分野を選択 / Select Agriculture Sector (SSW):
+                  </span>
+                  <span style={{ fontSize: '11.5px', color: '#9a3412', fontWeight: 600 }}>
+                    ※ 耕種農業または畜産農業を選択してください
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                    gap: '10px',
+                  }}
+                >
+                  {agriOption.subOptions.map((subOpt) => {
+                    const isSubOptSelected =
+                      subProgram === subOpt.id ||
+                      (subOpt.id.includes('Crop') && (subProgram === 'Agriculture' || subProgram.includes('Crop'))) ||
+                      (subOpt.id.includes('Livestock') && subProgram.includes('Livestock'));
+
+                    return (
+                      <button
+                        key={subOpt.id}
+                        type="button"
+                        onClick={() => onChangeSubProgram(subOpt.id)}
+                        style={{
+                          textAlign: 'left',
+                          padding: '12px 14px',
+                          borderRadius: '8px',
+                          border: isSubOptSelected ? '2px solid #ea580c' : '1.5px solid #fed7aa',
+                          background: isSubOptSelected ? '#fff7ed' : '#ffffff',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          boxShadow: isSubOptSelected ? '0 2px 6px rgba(234,88,12,0.15)' : 'none',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        <div>
+                          <div
+                            style={{
+                              fontSize: '13.5px',
+                              fontWeight: 800,
+                              color: isSubOptSelected ? '#c2410c' : '#1e293b',
+                            }}
+                          >
+                            {subOpt.label}
+                          </div>
+                          <div style={{ fontSize: '11.5px', color: '#7c2d12', marginTop: '2px', fontWeight: 600 }}>
+                            {subOpt.labelJp} · {subOpt.labelBn}
+                          </div>
+                        </div>
+
+                        <div
+                          style={{
+                            width: '18px',
+                            height: '18px',
+                            borderRadius: '50%',
+                            border: isSubOptSelected ? '2px solid #ea580c' : '1.5px solid #fed7aa',
+                            background: isSubOptSelected ? '#ea580c' : 'transparent',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {isSubOptSelected && <CheckCircle2 size={12} color="#ffffff" strokeWidth={3} />}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
 
           {subProgram && (
             <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'flex-end' }}>

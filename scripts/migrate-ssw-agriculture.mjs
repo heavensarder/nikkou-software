@@ -40,7 +40,7 @@ async function migrateSswAgriculture() {
   const conn = await mysql.createConnection(dbConfig);
   console.log('Connected successfully!');
 
-  console.log('\nScanning for existing SSW applicants with sub_program "Agriculture"...');
+  console.log('\nScanning for existing SSW applicants with category "Agriculture"...');
 
   const [rows] = await conn.query(
     'SELECT id, student_code, full_name, program, sub_program, details_json FROM student_cvs'
@@ -59,23 +59,27 @@ async function migrateSswAgriculture() {
     const currentProgram = (row.program || details.program || '').trim();
     const currentSubProgram = (row.sub_program || details.sub_program || details.subProgram || '').trim();
 
-    // Check if applicant is SSW and currently set to generic "Agriculture"
+    // Check if applicant is SSW and currently set to generic "Agriculture" (without specific sub-type)
     const isSsw = currentProgram.toLowerCase() === 'ssw';
-    const isAgri = currentSubProgram.toLowerCase() === 'agriculture';
+    const isGenericAgri = currentSubProgram.toLowerCase() === 'agriculture';
 
-    if (isSsw && isAgri) {
+    if (isSsw && isGenericAgri) {
       console.log(`- Updating Applicant ID ${row.id} [${row.student_code}]: "${row.full_name}"`);
-      console.log(`  Old Category: "${currentSubProgram}" -> New Category: "General crop farming" (耕種農業)`);
+      console.log(`  Old Category: "${currentSubProgram}" -> New Category: "Agriculture - General Crop Farming" (耕種農業)`);
+
+      const newCategory = 'Agriculture - General Crop Farming';
 
       // Update both top-level and details_json
-      details.sub_program = 'General crop farming';
+      details.sub_program = newCategory;
       if (details.subProgram) {
-        details.subProgram = 'General crop farming';
+        details.subProgram = newCategory;
       }
+      details.agriculture_type = 'General Crop Farming';
+      details.agriculture_type_jp = '耕種農業';
 
       await conn.query(
         'UPDATE student_cvs SET sub_program = ?, details_json = ? WHERE id = ?',
-        ['General crop farming', JSON.stringify(details), row.id]
+        [newCategory, JSON.stringify(details), row.id]
       );
 
       updatedCount++;
@@ -84,9 +88,9 @@ async function migrateSswAgriculture() {
 
   console.log(`\n======================================================`);
   if (updatedCount > 0) {
-    console.log(`SUCCESS: Updated ${updatedCount} applicant(s) to "General crop farming" (耕種農業).`);
+    console.log(`SUCCESS: Updated ${updatedCount} SSW applicant(s) to "Agriculture - General Crop Farming" (耕種農業).`);
   } else {
-    console.log('No applicants with SSW > Agriculture found. All records are up to date!');
+    console.log('No applicants with generic SSW > Agriculture found. All records are up to date!');
   }
   console.log(`======================================================\n`);
 
@@ -97,4 +101,3 @@ migrateSswAgriculture().catch((err) => {
   console.error('Migration failed:', err);
   process.exit(1);
 });
-

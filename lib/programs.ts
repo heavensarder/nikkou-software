@@ -1,8 +1,16 @@
+export interface SubSubProgramOption {
+  id: string;
+  label: string;
+  labelJp: string;
+  labelBn: string;
+}
+
 export interface SubProgramOption {
   id: string;
   label: string;
   labelJp: string;
   labelBn: string;
+  subOptions?: SubSubProgramOption[];
 }
 
 export interface ProgramOption {
@@ -53,16 +61,24 @@ export const PROGRAM_OPTIONS: ProgramOption[] = [
         labelBn: 'নার্সিং / কেয়ারগিভার',
       },
       {
-        id: 'General crop farming',
-        label: 'General crop farming',
-        labelJp: '耕種農業',
-        labelBn: 'সাধারণ ফসল চাষ',
-      },
-      {
-        id: 'General livestock farming',
-        label: 'General livestock farming',
-        labelJp: '畜産農業',
-        labelBn: 'সাধারণ গবাদিপশু পালন',
+        id: 'Agriculture',
+        label: 'Agriculture',
+        labelJp: '農業',
+        labelBn: 'কৃষি',
+        subOptions: [
+          {
+            id: 'Agriculture - General Crop Farming',
+            label: 'General Crop Farming',
+            labelJp: '耕種農業',
+            labelBn: 'সাধারণ ফসল চাষ',
+          },
+          {
+            id: 'Agriculture - General Livestock Farming',
+            label: 'General Livestock Farming',
+            labelJp: '畜産農業',
+            labelBn: 'সাধারণ গবাদিপশু পালন',
+          },
+        ],
       },
       {
         id: 'Construction',
