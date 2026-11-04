@@ -80,6 +80,10 @@ async function runLiveMigration() {
 
   let agriUpdatedCount = 0;
   let nursingSkillTestCount = 0;
+  let agriSkillTestCount = 0;
+  let constructionSkillTestCount = 0;
+  let cleaningSkillTestCount = 0;
+  let driverSkillTestCount = 0;
   let progNormalizedCount = 0;
 
   for (const row of rows) {
@@ -147,6 +151,98 @@ async function runLiveMigration() {
       }
     }
 
+    // D) SSW > Agriculture Skill Test initialization
+    const isAgriCrop =
+      isSsw &&
+      (newSubProg.toLowerCase().includes('crop') ||
+        newSubProg.includes('耕種') ||
+        newSubProg.toLowerCase() === 'agriculture - general crop farming');
+    const isAgriLivestock =
+      isSsw &&
+      (newSubProg.toLowerCase().includes('livestock') ||
+        newSubProg.includes('畜産') ||
+        newSubProg.toLowerCase() === 'agriculture - general livestock farming');
+
+    if (isAgriCrop) {
+      if (!details.skill_tests || typeof details.skill_tests !== 'object') {
+        details.skill_tests = {};
+      }
+      if (!details.skill_tests.agri_crop_skill_assessment_1) {
+        details.skill_tests.agri_crop_skill_assessment_1 = '準備中 / Preparing';
+        detailsChanged = true;
+        rowChanged = true;
+        agriSkillTestCount++;
+        console.log(`  🌾 [ID ${row.id} - ${row.student_code}] "${row.full_name}": Initialized Skill Test "農業技能測定試験1号（一般耕種農業）" -> 準備中 / Preparing`);
+      }
+    } else if (isAgriLivestock) {
+      if (!details.skill_tests || typeof details.skill_tests !== 'object') {
+        details.skill_tests = {};
+      }
+      if (!details.skill_tests.agri_livestock_skill_assessment_1) {
+        details.skill_tests.agri_livestock_skill_assessment_1 = '準備中 / Preparing';
+        detailsChanged = true;
+        rowChanged = true;
+        agriSkillTestCount++;
+        console.log(`  🐄 [ID ${row.id} - ${row.student_code}] "${row.full_name}": Initialized Skill Test "農業技能測定試験1号（一般畜産農業）" -> 準備中 / Preparing`);
+      }
+    }
+
+    // E) SSW > Construction Skill Test initialization
+    const isConstruction =
+      isSsw &&
+      (newSubProg.toLowerCase().includes('construction') || newSubProg.includes('建設'));
+
+    if (isConstruction) {
+      if (!details.skill_tests || typeof details.skill_tests !== 'object') {
+        details.skill_tests = {};
+      }
+      if (!details.skill_tests.construction_skill_eval_1_building) {
+        details.skill_tests.construction_skill_eval_1_building = '準備中 / Preparing';
+        detailsChanged = true;
+        rowChanged = true;
+        constructionSkillTestCount++;
+        console.log(`  🏗️ [ID ${row.id} - ${row.student_code}] "${row.full_name}": Initialized Skill Test "建設分野特定技能1号評価試験（建築）" -> 準備中 / Preparing`);
+      }
+    }
+
+    // F) SSW > Building Cleaning Skill Test initialization
+    const isCleaning =
+      isSsw &&
+      (newSubProg.toLowerCase().includes('cleaning') || newSubProg.includes('ビルクリーニング'));
+
+    if (isCleaning) {
+      if (!details.skill_tests || typeof details.skill_tests !== 'object') {
+        details.skill_tests = {};
+      }
+      if (!details.skill_tests.building_cleaning_skill_eval_1) {
+        details.skill_tests.building_cleaning_skill_eval_1 = '準備中 / Preparing';
+        detailsChanged = true;
+        rowChanged = true;
+        cleaningSkillTestCount++;
+        console.log(`  🧹 [ID ${row.id} - ${row.student_code}] "${row.full_name}": Initialized Skill Test "ビルクリーニング分野特定技能1号評価試験" -> 準備中 / Preparing`);
+      }
+    }
+
+    // G) SSW > Driver Skill Test initialization
+    const isDriver =
+      isSsw &&
+      (newSubProg.toLowerCase().includes('driver') ||
+        newSubProg.includes('ドライバー') ||
+        newSubProg.includes('自動車運送'));
+
+    if (isDriver) {
+      if (!details.skill_tests || typeof details.skill_tests !== 'object') {
+        details.skill_tests = {};
+      }
+      if (!details.skill_tests.driver_automobile_transport_eval) {
+        details.skill_tests.driver_automobile_transport_eval = '準備中 / Preparing';
+        detailsChanged = true;
+        rowChanged = true;
+        driverSkillTestCount++;
+        console.log(`  🚚 [ID ${row.id} - ${row.student_code}] "${row.full_name}": Initialized Skill Test "自動車運送業分野特定技能評価試験" -> 準備中 / Preparing`);
+      }
+    }
+
     // Ensure details_json has sub_program synced
     if (newSubProg && details.sub_program !== newSubProg) {
       details.sub_program = newSubProg;
@@ -169,6 +265,10 @@ async function runLiveMigration() {
   console.log(`- Program values normalized:             ${progNormalizedCount}`);
   console.log(`- SSW Agriculture applicants updated:    ${agriUpdatedCount}`);
   console.log(`- SSW Nursing Skill Tests initialized:   ${nursingSkillTestCount}`);
+  console.log(`- SSW Agriculture Tests initialized:     ${agriSkillTestCount}`);
+  console.log(`- SSW Construction Tests initialized:    ${constructionSkillTestCount}`);
+  console.log(`- SSW Cleaning Tests initialized:        ${cleaningSkillTestCount}`);
+  console.log(`- SSW Driver Tests initialized:          ${driverSkillTestCount}`);
   console.log('================================================================');
   console.log('All live database updates completed successfully!\n');
 
@@ -180,4 +280,3 @@ runLiveMigration().catch((err) => {
   console.error(err);
   process.exit(1);
 });
-

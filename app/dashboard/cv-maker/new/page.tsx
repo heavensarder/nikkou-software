@@ -2106,6 +2106,17 @@ function CreateNewCvContent() {
             disabled={saving}
           />
 
+          {/* SECTION: 技能試験 / স্কিল টেস্ট (Skill Test - SSW) */}
+          <SkillTestSection
+            program={program}
+            subProgram={subProgram}
+            skillTests={skillTests}
+            onChange={(testId, val) => {
+              setSkillTests((prev) => ({ ...prev, [testId]: val }));
+            }}
+            disabled={saving}
+          />
+
           {/* SECTION 4: その他言語 / অন্যান্য ভাষা */}
           <div
             style={{

@@ -57,6 +57,7 @@ function PublicStudentCvFormContent() {
   const [highestEdu, setHighestEdu] = useState('HSC / 12th Grade');
   const [instituteName, setInstituteName] = useState('');
   const [studyReason, setStudyReason] = useState('');
+  const [skillTests, setSkillTests] = useState<Record<string, string>>({});
 
   // Submission State
   const [submitting, setSubmitting] = useState(false);
@@ -112,6 +113,7 @@ function PublicStudentCvFormContent() {
             highest_education: highestEdu,
             institution_name: instituteName.trim(),
             reason_for_japan: studyReason.trim(),
+            skill_tests: skillTests,
             submitted_at: new Date().toISOString(),
           },
         }),
@@ -400,6 +402,17 @@ function PublicStudentCvFormContent() {
                 </div>
               </div>
             </div>
+
+            {/* SECTION: 技能試験 / স্কিল টেস্ট (Skill Test - SSW) */}
+            <SkillTestSection
+              program={program}
+              subProgram={subProgram}
+              skillTests={skillTests}
+              onChange={(testId, val) => {
+                setSkillTests((prev) => ({ ...prev, [testId]: val }));
+              }}
+              disabled={submitting}
+            />
 
             {/* Section 3: Study in Japan Goals */}
             <div style={{ marginBottom: '32px' }}>
