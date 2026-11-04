@@ -2,29 +2,33 @@ import mysql from 'mysql2/promise';
 import fs from 'fs';
 import path from 'path';
 
-// Automatically load .env configuration if present
-try {
-  const envPath = path.resolve('.env');
-  if (fs.existsSync(envPath)) {
-    const envContent = fs.readFileSync(envPath, 'utf8');
-    for (const line of envContent.split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) continue;
-      const idx = trimmed.indexOf('=');
-      if (idx > 0) {
-        const key = trimmed.slice(0, idx).trim();
-        let val = trimmed.slice(idx + 1).trim();
-        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-          val = val.slice(1, -1);
-        }
-        if (!process.env[key]) {
-          process.env[key] = val;
+// Automatically load environment configuration if present (.env.production, .env.local, .env)
+const envCandidates = ['.env.production', '.env.local', '.env'];
+for (const cand of envCandidates) {
+  try {
+    const envPath = path.resolve(cand);
+    if (fs.existsSync(envPath)) {
+      console.log(`Loaded environment variables from ${cand}`);
+      const envContent = fs.readFileSync(envPath, 'utf8');
+      for (const line of envContent.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const idx = trimmed.indexOf('=');
+        if (idx > 0) {
+          const key = trimmed.slice(0, idx).trim();
+          let val = trimmed.slice(idx + 1).trim();
+          if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+            val = val.slice(1, -1);
+          }
+          if (!process.env[key]) {
+            process.env[key] = val;
+          }
         }
       }
     }
+  } catch {
+    // ignore
   }
-} catch (e) {
-  // ignore
 }
 
 const dbConfig = {
@@ -50,23 +54,68 @@ async function runLiveMigration() {
   console.log('================================================================');
   console.log(`Connecting to database "${dbConfig.database}" at ${dbConfig.host}:${dbConfig.port}...`);
 
-  const conn = await mysql.createConnection(dbConfig);
-  console.log('Connected to MySQL successfully!\n');
+  let conn;
+  try {
+    conn = await mysql.createConnection(dbConfig);
+    console.log('Connected to MySQL successfully!\n');
+  } catch (err) {
+    console.error('ERROR: Could not connect to database with current credentials.');
+    console.error(`Details: ${err.message}`);
+    console.log('\nTIP: You can pass live credentials directly on the command line:');
+    console.log('  DB_HOST=localhost DB_USER=my_user DB_PASSWORD="my_password" DB_NAME=my_db node scripts/migrate-live-database.mjs\n');
+    process.exit(1);
+  }
 
   // Step 1: Ensure columns exist
   console.log('Step 1: Checking student_cvs table schema...');
+  let hasProgram = false;
+  let hasSubProgram = false;
   try {
     const [cols] = await conn.query('SHOW COLUMNS FROM student_cvs');
     const colNames = cols.map((c) => c.Field);
 
     if (!colNames.includes('program')) {
       console.log('  Adding missing column: `program` VARCHAR(100) NULL...');
-      await conn.query('ALTER TABLE student_cvs ADD COLUMN program VARCHAR(100) NULL AFTER target_intake');
+      try {
+        await conn.query('ALTER TABLE student_cvs ADD COLUMN program VARCHAR(100) NULL AFTER target_intake');
+      } catch {
+        await conn.query('ALTER TABLE student_cvs ADD COLUMN program VARCHAR(100) NULL');
+      }
+      hasProgram = true;
+    } else {
+      hasProgram = true;
     }
+
     if (!colNames.includes('sub_program')) {
       console.log('  Adding missing column: `sub_program` VARCHAR(150) NULL...');
-      await conn.query('ALTER TABLE student_cvs ADD COLUMN sub_program VARCHAR(150) NULL AFTER program');
+      try {
+        await conn.query('ALTER TABLE student_cvs ADD COLUMN sub_program VARCHAR(150) NULL AFTER program');
+      } catch {
+        await conn.query('ALTER TABLE student_cvs ADD COLUMN sub_program VARCHAR(150) NULL');
+      }
+      hasSubProgram = true;
+    } else {
+      hasSubProgram = true;
     }
+
+    if (!colNames.includes('edit_token')) {
+      console.log('  Adding missing column: `edit_token` VARCHAR(64) NULL...');
+      try {
+        await conn.query('ALTER TABLE student_cvs ADD COLUMN edit_token VARCHAR(64) NULL AFTER status');
+      } catch {
+        await conn.query('ALTER TABLE student_cvs ADD COLUMN edit_token VARCHAR(64) NULL');
+      }
+    }
+
+    if (!colNames.includes('is_read')) {
+      console.log('  Adding missing column: `is_read` TINYINT(1) DEFAULT 1...');
+      try {
+        await conn.query('ALTER TABLE student_cvs ADD COLUMN is_read TINYINT(1) DEFAULT 1 AFTER status');
+      } catch {
+        await conn.query('ALTER TABLE student_cvs ADD COLUMN is_read TINYINT(1) DEFAULT 1');
+      }
+    }
+
     console.log('  Columns verified.\n');
   } catch (err) {
     console.warn('  Schema check note:', err.message);
@@ -74,9 +123,10 @@ async function runLiveMigration() {
 
   // Step 2: Scan and update student records
   console.log('Step 2: Scanning student_cvs records to normalize programs, update SSW Agriculture, and initialize Skill Tests...');
-  const [rows] = await conn.query(
-    'SELECT id, student_code, full_name, program, sub_program, details_json FROM student_cvs'
-  );
+  const selectQuery = hasProgram && hasSubProgram
+    ? 'SELECT id, student_code, full_name, program, sub_program, details_json FROM student_cvs'
+    : 'SELECT id, student_code, full_name, details_json FROM student_cvs';
+  const [rows] = await conn.query(selectQuery);
 
   let agriUpdatedCount = 0;
   let nursingSkillTestCount = 0;
@@ -251,32 +301,37 @@ async function runLiveMigration() {
     }
 
     if (rowChanged) {
-      await conn.query(
-        'UPDATE student_cvs SET program = ?, sub_program = ?, details_json = ? WHERE id = ?',
-        [normProg || null, newSubProg || null, JSON.stringify(details), row.id]
-      );
+      if (hasProgram && hasSubProgram) {
+        await conn.query(
+          'UPDATE student_cvs SET program = ?, sub_program = ?, details_json = ? WHERE id = ?',
+          [normProg || row.program || null, newSubProg || row.sub_program || null, JSON.stringify(details), row.id]
+        );
+      } else {
+        await conn.query(
+          'UPDATE student_cvs SET details_json = ? WHERE id = ?',
+          [JSON.stringify(details), row.id]
+        );
+      }
     }
   }
 
   console.log('\n================================================================');
-  console.log(' MIGRATION RESULTS');
+  console.log(' LIVE MIGRATION COMPLETED SUCCESSFULLY!');
   console.log('================================================================');
-  console.log(`- Total records scanned:                 ${rows.length}`);
-  console.log(`- Program values normalized:             ${progNormalizedCount}`);
-  console.log(`- SSW Agriculture applicants updated:    ${agriUpdatedCount}`);
-  console.log(`- SSW Nursing Skill Tests initialized:   ${nursingSkillTestCount}`);
-  console.log(`- SSW Agriculture Tests initialized:     ${agriSkillTestCount}`);
-  console.log(`- SSW Construction Tests initialized:    ${constructionSkillTestCount}`);
-  console.log(`- SSW Cleaning Tests initialized:        ${cleaningSkillTestCount}`);
-  console.log(`- SSW Driver Tests initialized:          ${driverSkillTestCount}`);
-  console.log('================================================================');
-  console.log('All live database updates completed successfully!\n');
+  console.log(`Total students scanned: ${rows.length}`);
+  console.log(`Programs normalized: ${progNormalizedCount}`);
+  console.log(`SSW Agriculture records upgraded to General Crop Farming: ${agriUpdatedCount}`);
+  console.log(`SSW Caregiver Skill Tests initialized: ${nursingSkillTestCount}`);
+  console.log(`SSW Agriculture Skill Tests initialized: ${agriSkillTestCount}`);
+  console.log(`SSW Construction Skill Tests initialized: ${constructionSkillTestCount}`);
+  console.log(`SSW Building Cleaning Skill Tests initialized: ${cleaningSkillTestCount}`);
+  console.log(`SSW Driver Skill Tests initialized: ${driverSkillTestCount}`);
+  console.log('================================================================\n');
 
   await conn.end();
 }
 
 runLiveMigration().catch((err) => {
-  console.error('\n❌ MIGRATION FAILED:', err.message);
-  console.error(err);
+  console.error('\n Migration aborted with error:', err);
   process.exit(1);
 });

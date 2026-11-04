@@ -26,6 +26,7 @@ import {
   Link2,
   Lock,
   RefreshCw,
+  AlertCircle,
 } from 'lucide-react';
 import { StudentCv } from '@/types/cv';
 import { PROGRAM_OPTIONS, getSubPrograms, formatProgramBadge, normalizeProgramId } from '@/lib/programs';
@@ -138,6 +139,7 @@ export default function StudentListPage() {
   const [students, setStudents] = useState<StudentCv[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [newlyArrivedIds, setNewlyArrivedIds] = useState<Set<number>>(new Set());
   const [newStudentNotification, setNewStudentNotification] = useState<StudentCv | null>(null);
   const isFirstLoadRef = useRef(true);
@@ -521,6 +523,7 @@ export default function StudentListPage() {
           }
 
           knownStudentIdsRef.current = new Set(freshStudents.map((s) => s.id));
+          setFetchError(null);
           setStudents(freshStudents);
 
           // Keep activeStudent in preview drawer synced in realtime
@@ -530,10 +533,21 @@ export default function StudentListPage() {
               setActiveStudent(updatedActive);
             }
           }
+        } else {
+          setFetchError(data.message || 'Could not parse student records');
+        }
+      } else {
+        if (res.status === 401) {
+          setFetchError('Session expired. Please log in again.');
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          console.error('API error fetching students:', res.status, errData);
+          setFetchError(errData.message || `Server error (${res.status}) while loading applicants.`);
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to load students:', err);
+      setFetchError(err.message || 'Network error connecting to server');
     } finally {
       setLoading(false);
       setIsRefreshing(false);
@@ -1059,6 +1073,40 @@ export default function StudentListPage() {
                 <tr>
                   <td colSpan={8} style={{ textAlign: 'center', padding: '40px' }}>
                     Loading student records...
+                  </td>
+                </tr>
+              ) : fetchError ? (
+                <tr>
+                  <td colSpan={8}>
+                    <div className={styles.emptyState} style={{ borderColor: '#fecaca', background: '#fff5f5' }}>
+                      <div className={styles.emptyIcon} style={{ background: '#fee2e2', color: '#dc2626' }}>
+                        <AlertCircle size={24} />
+                      </div>
+                      <h3 style={{ color: '#991b1b' }}>Failed to Load Applicants</h3>
+                      <p style={{ marginTop: '4px', fontSize: '13px', color: '#7f1d1d' }}>
+                        {fetchError}
+                      </p>
+                      <div style={{ marginTop: '14px', display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                        {fetchError.includes('Session expired') ? (
+                          <Link
+                            href="/"
+                            className={styles.primaryBtn}
+                            style={{ padding: '6px 14px', fontSize: '13px' }}
+                          >
+                            Log In Again
+                          </Link>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => fetchStudents(searchQuery, selectedStatus, selectedProgram, selectedSubProgram, false)}
+                            className={styles.secondaryBtn}
+                            style={{ padding: '6px 14px', fontSize: '13px' }}
+                          >
+                            Retry Loading
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </td>
                 </tr>
               ) : students.length === 0 ? (

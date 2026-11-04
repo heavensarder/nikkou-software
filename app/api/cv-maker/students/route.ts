@@ -5,6 +5,52 @@ import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import crypto from 'crypto';
 import { sanitizeDbDate, mapGenderToDbEnum, formatJapaneseBirthDate } from '@/lib/cv-normalizer';
 
+let cachedColumns: Set<string> | null = null;
+let lastColumnCheck = 0;
+
+async function getStudentCvColumns(): Promise<Set<string>> {
+  const now = Date.now();
+  if (cachedColumns && now - lastColumnCheck < 60000) {
+    return cachedColumns;
+  }
+  try {
+    const cols = await query<RowDataPacket[]>('SHOW COLUMNS FROM student_cvs');
+    cachedColumns = new Set(cols.map((c: any) => c.Field));
+    lastColumnCheck = now;
+
+    // Self-healing: if program, sub_program, is_read, or edit_token are missing, attempt to add them seamlessly
+    if (!cachedColumns.has('program')) {
+      try {
+        await query('ALTER TABLE student_cvs ADD COLUMN program VARCHAR(100) NULL');
+        cachedColumns.add('program');
+      } catch {}
+    }
+    if (!cachedColumns.has('sub_program')) {
+      try {
+        await query('ALTER TABLE student_cvs ADD COLUMN sub_program VARCHAR(150) NULL');
+        cachedColumns.add('sub_program');
+      } catch {}
+    }
+    if (!cachedColumns.has('edit_token')) {
+      try {
+        await query('ALTER TABLE student_cvs ADD COLUMN edit_token VARCHAR(64) NULL');
+        cachedColumns.add('edit_token');
+      } catch {}
+    }
+    if (!cachedColumns.has('is_read')) {
+      try {
+        await query('ALTER TABLE student_cvs ADD COLUMN is_read TINYINT(1) DEFAULT 1');
+        cachedColumns.add('is_read');
+      } catch {}
+    }
+
+    return cachedColumns;
+  } catch (e) {
+    console.warn('Could not inspect student_cvs columns:', e);
+    return cachedColumns || new Set();
+  }
+}
+
 function generateStudentCode(id: number): string {
   const year = new Date().getFullYear();
   return `NK-${year}-${String(id).padStart(4, '0')}`;
@@ -24,6 +70,11 @@ export async function GET(request: NextRequest) {
     const formId = searchParams.get('form_id') || '';
     const program = searchParams.get('program') || '';
     const subProgram = searchParams.get('sub_program') || searchParams.get('category') || '';
+
+    const cols = await getStudentCvColumns();
+    const hasProgramCol = cols.has('program');
+    const hasSubProgCol = cols.has('sub_program');
+    const hasIsReadCol = cols.has('is_read');
 
     let sql = `
       SELECT s.*, f.title as form_title, f.form_code 
@@ -65,7 +116,7 @@ export async function GET(request: NextRequest) {
 
     if (status) {
       if (status === 'unread') {
-        sql += ` AND s.is_read = 0`;
+        if (hasIsReadCol) { sql += ` AND s.is_read = 0`; }
       } else {
         sql += ` AND s.status = ?`;
         params.push(status);
@@ -83,30 +134,30 @@ export async function GET(request: NextRequest) {
         sql += ` AND (
           LOWER(s.program) LIKE '%ssw%'
           OR s.program LIKE '%特定技能%'
-          OR LOWER(s.details_json->>'$.program') LIKE '%ssw%'
-          OR LOWER(s.details_json->>'$.selectedProgram') LIKE '%ssw%'
-          OR s.details_json->>'$.program' LIKE '%特定技能%'
+          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%ssw%'
+          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%ssw%'
+          OR CAST(s.details_json AS CHAR) LIKE '%特定技能%'
         )`;
       } else if (p.includes('titp') || p.includes('esd') || p.includes('実習')) {
         sql += ` AND (
           LOWER(s.program) LIKE '%titp%'
           OR LOWER(s.program) LIKE '%esd%'
           OR s.program LIKE '%実習%'
-          OR LOWER(s.details_json->>'$.program') LIKE '%titp%'
-          OR LOWER(s.details_json->>'$.selectedProgram') LIKE '%titp%'
+          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%titp%'
+          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%titp%'
         )`;
       } else if (p.includes('student') || p.includes('留学')) {
         sql += ` AND (
           LOWER(s.program) LIKE '%student%'
           OR s.program LIKE '%留学%'
-          OR LOWER(s.details_json->>'$.program') LIKE '%student%'
-          OR LOWER(s.details_json->>'$.selectedProgram') LIKE '%student%'
+          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%student%'
+          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%student%'
         )`;
       } else {
         sql += ` AND (
           LOWER(s.program) = LOWER(?)
-          OR LOWER(s.details_json->>'$.program') = LOWER(?)
-          OR LOWER(s.details_json->>'$.selectedProgram') = LOWER(?)
+          OR LOWER(CAST(s.details_json AS CHAR)) = LOWER(?)
+          OR LOWER(CAST(s.details_json AS CHAR)) = LOWER(?)
         )`;
         params.push(program, program, program);
       }
@@ -123,46 +174,46 @@ export async function GET(request: NextRequest) {
           OR s.sub_program LIKE '%農業%'
           OR s.sub_program LIKE '%耕種%'
           OR s.sub_program LIKE '%畜産%'
-          OR LOWER(s.details_json->>'$.sub_program') LIKE '%agriculture%'
-          OR LOWER(s.details_json->>'$.sub_program') LIKE '%crop%'
-          OR LOWER(s.details_json->>'$.sub_program') LIKE '%livestock%'
-          OR LOWER(s.details_json->>'$.sub_program') LIKE '%farming%'
-          OR LOWER(s.details_json->>'$.subProgram') LIKE '%agriculture%'
-          OR LOWER(s.details_json->>'$.subProgram') LIKE '%crop%'
-          OR LOWER(s.details_json->>'$.subProgram') LIKE '%livestock%'
-          OR LOWER(s.details_json->>'$.category') LIKE '%agriculture%'
-          OR LOWER(s.details_json->>'$.category') LIKE '%crop%'
-          OR LOWER(s.details_json->>'$.category') LIKE '%livestock%'
-          OR s.details_json->>'$.sub_program' LIKE '%農業%'
-          OR s.details_json->>'$.sub_program' LIKE '%耕種%'
-          OR s.details_json->>'$.sub_program' LIKE '%畜産%'
+          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%agriculture%'
+          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%crop%'
+          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%livestock%'
+          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%farming%'
+          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%agriculture%'
+          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%crop%'
+          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%livestock%'
+          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%agriculture%'
+          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%crop%'
+          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%livestock%'
+          OR CAST(s.details_json AS CHAR) LIKE '%農業%'
+          OR CAST(s.details_json AS CHAR) LIKE '%耕種%'
+          OR CAST(s.details_json AS CHAR) LIKE '%畜産%'
         )`;
       } else if (sub.includes('crop') || sub.includes('耕種')) {
         sql += ` AND (
           LOWER(s.sub_program) LIKE '%crop%'
           OR s.sub_program LIKE '%耕種%'
-          OR LOWER(s.details_json->>'$.sub_program') LIKE '%crop%'
-          OR LOWER(s.details_json->>'$.subProgram') LIKE '%crop%'
-          OR LOWER(s.details_json->>'$.category') LIKE '%crop%'
-          OR LOWER(s.details_json->>'$.agriculture_type') LIKE '%crop%'
-          OR s.details_json->>'$.sub_program' LIKE '%耕種%'
+          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%crop%'
+          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%crop%'
+          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%crop%'
+          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%crop%'
+          OR CAST(s.details_json AS CHAR) LIKE '%耕種%'
         )`;
       } else if (sub.includes('livestock') || sub.includes('畜産')) {
         sql += ` AND (
           LOWER(s.sub_program) LIKE '%livestock%'
           OR s.sub_program LIKE '%畜産%'
-          OR LOWER(s.details_json->>'$.sub_program') LIKE '%livestock%'
-          OR LOWER(s.details_json->>'$.subProgram') LIKE '%livestock%'
-          OR LOWER(s.details_json->>'$.category') LIKE '%livestock%'
-          OR LOWER(s.details_json->>'$.agriculture_type') LIKE '%livestock%'
-          OR s.details_json->>'$.sub_program' LIKE '%畜産%'
+          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%livestock%'
+          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%livestock%'
+          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%livestock%'
+          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%livestock%'
+          OR CAST(s.details_json AS CHAR) LIKE '%畜産%'
         )`;
       } else {
         sql += ` AND (
           LOWER(s.sub_program) = LOWER(?)
-          OR LOWER(s.details_json->>'$.sub_program') = LOWER(?)
-          OR LOWER(s.details_json->>'$.subProgram') = LOWER(?)
-          OR LOWER(s.details_json->>'$.category') = LOWER(?)
+          OR LOWER(CAST(s.details_json AS CHAR)) = LOWER(?)
+          OR LOWER(CAST(s.details_json AS CHAR)) = LOWER(?)
+          OR LOWER(CAST(s.details_json AS CHAR)) = LOWER(?)
         )`;
         params.push(subProgram, subProgram, subProgram, subProgram);
       }
@@ -173,32 +224,47 @@ export async function GET(request: NextRequest) {
     const students = await query<RowDataPacket[]>(sql, params);
 
     const parsedStudents = students.map((s) => {
-      let details = s.details_json;
-      if (typeof details === 'string') {
-        try {
-          details = JSON.parse(details);
-        } catch {
+      try {
+        let details: any = s.details_json;
+        if (typeof details === 'string') {
+          try {
+            details = JSON.parse(details);
+          } catch {
+            details = {};
+          }
+        }
+        if (!details || typeof details !== 'object' || Array.isArray(details)) {
           details = {};
         }
-      }
-      if (details) {
-        if (details.language_bengali && details.language_bengali.includes('出来る')) {
+
+        if (typeof details.language_bengali === 'string' && details.language_bengali.includes('出来る')) {
           details.language_bengali = '可 / পারি';
         }
-        if (details.language_english && details.language_english.includes('出来る')) {
+        if (typeof details.language_english === 'string' && details.language_english.includes('出来る')) {
           details.language_english = '可 / পারি';
         }
-      }
-      const dobStr = sanitizeDbDate(s.date_of_birth) || sanitizeDbDate(details?.dob_japanese) || null;
 
-      return {
-        ...s,
-        is_read: Boolean(s.is_read),
-        date_of_birth: dobStr,
-        program: s.program || details?.program || details?.selectedProgram || null,
-        sub_program: s.sub_program || details?.sub_program || details?.subProgram || details?.category || null,
-        details_json: details || {},
-      };
+        const dobStr = sanitizeDbDate(s.date_of_birth) || sanitizeDbDate(details?.dob_japanese) || null;
+
+        return {
+          ...s,
+          is_read: Boolean(s.is_read),
+          date_of_birth: dobStr,
+          program: s.program || details?.program || details?.selectedProgram || null,
+          sub_program: s.sub_program || details?.sub_program || details?.subProgram || details?.category || null,
+          details_json: details,
+        };
+      } catch (rowErr) {
+        console.error(`Error parsing student row ${s.id}:`, rowErr);
+        return {
+          ...s,
+          is_read: Boolean(s.is_read),
+          date_of_birth: sanitizeDbDate(s.date_of_birth) || null,
+          program: s.program || null,
+          sub_program: s.sub_program || null,
+          details_json: typeof s.details_json === 'object' && s.details_json ? s.details_json : {},
+        };
+      }
     });
 
     return NextResponse.json({ success: true, students: parsedStudents });

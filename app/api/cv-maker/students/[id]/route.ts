@@ -42,10 +42,10 @@ export async function GET(
     if (student.details_json) {
       student.details_json.program = student.program;
       student.details_json.sub_program = student.sub_program;
-      if (student.details_json.language_bengali && student.details_json.language_bengali.includes('出来る')) {
+      if (typeof student.details_json.language_bengali === 'string' && student.details_json.language_bengali.includes('出来る')) {
         student.details_json.language_bengali = '可 / পারি';
       }
-      if (student.details_json.language_english && student.details_json.language_english.includes('出来る')) {
+      if (typeof student.details_json.language_english === 'string' && student.details_json.language_english.includes('出来る')) {
         student.details_json.language_english = '可 / পারি';
       }
     }
@@ -111,11 +111,11 @@ export async function PUT(
       mergedDetails.dob_japanese = '—';
     }
 
-    if (mergedDetails.language_bengali) {
+    if (typeof mergedDetails.language_bengali === 'string') {
       if (mergedDetails.language_bengali.includes('出来る')) mergedDetails.language_bengali = '可 / পারি';
       if (mergedDetails.language_bengali.includes('少し出来る')) mergedDetails.language_bengali = '少し可 / কিছুটা পারি';
     }
-    if (mergedDetails.language_english) {
+    if (typeof mergedDetails.language_english === 'string') {
       if (mergedDetails.language_english.includes('出来る')) mergedDetails.language_english = '可 / পারি';
       if (mergedDetails.language_english.includes('少し出来る')) mergedDetails.language_english = '少し可 / কিছুটা পারি';
     }
