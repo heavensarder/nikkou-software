@@ -258,7 +258,7 @@ export default function ProgramCategorySection({
             }}
           >
             {currentSubPrograms.map((sub) => {
-              const isSelected = subProgram === sub.id;
+              const isSelected = subProgram === sub.id || (program === 'SSW' && sub.id === 'General crop farming' && subProgram === 'Agriculture');
               return (
                 <button
                   key={sub.id}

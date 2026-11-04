@@ -86,12 +86,21 @@ export async function GET(request: NextRequest) {
     }
 
     if (subProgram) {
-      sql += ` AND (
-        LOWER(s.sub_program) = LOWER(?)
-        OR LOWER(s.details_json->>'$.sub_program') = LOWER(?)
-        OR LOWER(s.details_json->>'$.subProgram') = LOWER(?)
-      )`;
-      params.push(subProgram, subProgram, subProgram);
+      if (subProgram.toLowerCase() === 'general crop farming') {
+        sql += ` AND (
+          LOWER(s.sub_program) IN (LOWER(?), 'agriculture')
+          OR LOWER(s.details_json->>'$.sub_program') IN (LOWER(?), 'agriculture')
+          OR LOWER(s.details_json->>'$.subProgram') IN (LOWER(?), 'agriculture')
+        )`;
+        params.push(subProgram, subProgram, subProgram);
+      } else {
+        sql += ` AND (
+          LOWER(s.sub_program) = LOWER(?)
+          OR LOWER(s.details_json->>'$.sub_program') = LOWER(?)
+          OR LOWER(s.details_json->>'$.subProgram') = LOWER(?)
+        )`;
+        params.push(subProgram, subProgram, subProgram);
+      }
     }
 
     sql += ` ORDER BY s.created_at DESC`;

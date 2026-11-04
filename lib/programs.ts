@@ -53,10 +53,16 @@ export const PROGRAM_OPTIONS: ProgramOption[] = [
         labelBn: 'নার্সিং / কেয়ারগিভার',
       },
       {
-        id: 'Agriculture',
-        label: 'Agriculture',
-        labelJp: '農業',
-        labelBn: 'কৃষি',
+        id: 'General crop farming',
+        label: 'General crop farming',
+        labelJp: '耕種農業',
+        labelBn: 'সাধারণ ফসল চাষ',
+      },
+      {
+        id: 'General livestock farming',
+        label: 'General livestock farming',
+        labelJp: '畜産農業',
+        labelBn: 'সাধারণ গবাদিপশু পালন',
       },
       {
         id: 'Construction',
