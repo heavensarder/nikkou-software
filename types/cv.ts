@@ -98,6 +98,8 @@ export interface StudentCv {
     japan_visa_type_applied?: string;
     // Section 3: 学歴 / শিক্ষাগত যোগ্যতা
     education_history?: EducationEntry[];
+    // Section: 技能試験 / স্কিল টেস্ট (Skill Test - SSW)
+    skill_tests?: Record<string, string>;
     // Section 4: その他言語 / অন্যান্য ভাষা
     language_bengali?: string;
     language_english?: string;

@@ -128,13 +128,82 @@ export const PROGRAM_OPTIONS: ProgramOption[] = [
   },
 ];
 
+export function normalizeProgramId(prog?: string | null): string {
+  if (!prog) return '';
+  const trimmed = prog.trim();
+  const lower = trimmed.toLowerCase();
+  if (lower === 'ssw' || lower.includes('特定技能') || lower.includes('specified skilled')) return 'SSW';
+  if (lower.includes('titp') || lower.includes('esd') || lower.includes('技能実習') || lower.includes('technical intern')) return 'TITP/ESD';
+  if (lower.includes('student') || lower.includes('留学') || lower.includes('study')) return 'Student';
+  const direct = PROGRAM_OPTIONS.find((p) => p.id.toLowerCase() === lower || p.label.toLowerCase() === lower);
+  if (direct) return direct.id;
+  return trimmed;
+}
+
+export function isSubProgramMatching(candidate: string | null | undefined, targetId: string): boolean {
+  if (!candidate || !targetId) return false;
+  const c = candidate.trim().toLowerCase();
+  const t = targetId.trim().toLowerCase();
+  if (c === t) return true;
+
+  // General Crop Farming matching
+  if (t.includes('crop') || t.includes('耕種')) {
+    return c.includes('crop') || c.includes('耕種');
+  }
+
+  // General Livestock Farming matching
+  if (t.includes('livestock') || t.includes('畜産')) {
+    return c.includes('livestock') || c.includes('畜産');
+  }
+
+  // SSW Agriculture umbrella matching
+  if (t === 'agriculture') {
+    return (
+      c === 'agriculture' ||
+      c.includes('crop') ||
+      c.includes('livestock') ||
+      c.includes('farming') ||
+      c.includes('農業') ||
+      c.includes('耕種') ||
+      c.includes('畜産')
+    );
+  }
+
+  // Other subprograms
+  if (t.includes('nursing') || t.includes('caregiver')) {
+    return c.includes('nursing') || c.includes('caregiver') || c.includes('介護');
+  }
+  if (t.includes('construction')) {
+    return c.includes('construction') || c.includes('建設');
+  }
+  if (t.includes('cleaning')) {
+    return c.includes('cleaning') || c.includes('ビルクリーニング');
+  }
+  if (t.includes('driver')) {
+    return c.includes('driver') || c.includes('ドライバー');
+  }
+  if (t.includes('restaurant') || t.includes('food')) {
+    return c.includes('restaurant') || c.includes('food') || c.includes('外食');
+  }
+
+  return false;
+}
+
 export function getSubPrograms(programId: string): SubProgramOption[] {
-  const match = PROGRAM_OPTIONS.find((p) => p.id === programId);
+  const normalized = normalizeProgramId(programId);
+  const match = PROGRAM_OPTIONS.find(
+    (p) => p.id === normalized || p.id.toLowerCase() === programId?.trim().toLowerCase()
+  );
   return match ? match.subPrograms : [];
 }
 
 export function formatProgramBadge(program?: string | null, subProgram?: string | null): string {
   if (!program && !subProgram) return '—';
-  if (program && subProgram) return `${program} · ${subProgram}`;
-  return (program || subProgram) as string;
+  const normProg = normalizeProgramId(program) || program;
+  let cleanSub = subProgram || '';
+  if (cleanSub.startsWith('Agriculture - ')) {
+    cleanSub = cleanSub.replace('Agriculture - ', '');
+  }
+  if (normProg && cleanSub) return `${normProg} · ${cleanSub}`;
+  return (normProg || cleanSub) as string;
 }

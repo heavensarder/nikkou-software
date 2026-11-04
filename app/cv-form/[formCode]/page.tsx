@@ -4,6 +4,8 @@ import React, { useState, useEffect, Suspense } from 'react';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import ProgramCategorySection from '@/components/ProgramCategorySection';
+import SkillTestSection from '@/components/SkillTestSection';
+import { normalizeProgramId } from '@/lib/programs';
 import { normalizeCandidateDob } from '@/lib/cv-normalizer';
 import styles from '../cv-form.module.css';
 import {

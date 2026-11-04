@@ -78,42 +78,93 @@ export async function GET(request: NextRequest) {
     }
 
     if (program) {
-      sql += ` AND (
-        LOWER(s.program) = LOWER(?)
-        OR LOWER(s.details_json->>'$.program') = LOWER(?)
-      )`;
-      params.push(program, program);
+      const p = program.toLowerCase();
+      if (p.includes('ssw') || p.includes('特定技能')) {
+        sql += ` AND (
+          LOWER(s.program) LIKE '%ssw%'
+          OR s.program LIKE '%特定技能%'
+          OR LOWER(s.details_json->>'$.program') LIKE '%ssw%'
+          OR LOWER(s.details_json->>'$.selectedProgram') LIKE '%ssw%'
+          OR s.details_json->>'$.program' LIKE '%特定技能%'
+        )`;
+      } else if (p.includes('titp') || p.includes('esd') || p.includes('実習')) {
+        sql += ` AND (
+          LOWER(s.program) LIKE '%titp%'
+          OR LOWER(s.program) LIKE '%esd%'
+          OR s.program LIKE '%実習%'
+          OR LOWER(s.details_json->>'$.program') LIKE '%titp%'
+          OR LOWER(s.details_json->>'$.selectedProgram') LIKE '%titp%'
+        )`;
+      } else if (p.includes('student') || p.includes('留学')) {
+        sql += ` AND (
+          LOWER(s.program) LIKE '%student%'
+          OR s.program LIKE '%留学%'
+          OR LOWER(s.details_json->>'$.program') LIKE '%student%'
+          OR LOWER(s.details_json->>'$.selectedProgram') LIKE '%student%'
+        )`;
+      } else {
+        sql += ` AND (
+          LOWER(s.program) = LOWER(?)
+          OR LOWER(s.details_json->>'$.program') = LOWER(?)
+          OR LOWER(s.details_json->>'$.selectedProgram') = LOWER(?)
+        )`;
+        params.push(program, program, program);
+      }
     }
 
     if (subProgram) {
       const sub = subProgram.toLowerCase();
-      if (sub === 'agriculture' || sub.includes('all')) {
+      if (sub === 'agriculture' || sub.includes('agriculture') || sub.includes('all')) {
         sql += ` AND (
           LOWER(s.sub_program) LIKE '%agriculture%'
+          OR LOWER(s.sub_program) LIKE '%crop%'
+          OR LOWER(s.sub_program) LIKE '%livestock%'
+          OR LOWER(s.sub_program) LIKE '%farming%'
+          OR s.sub_program LIKE '%農業%'
+          OR s.sub_program LIKE '%耕種%'
+          OR s.sub_program LIKE '%畜産%'
           OR LOWER(s.details_json->>'$.sub_program') LIKE '%agriculture%'
+          OR LOWER(s.details_json->>'$.sub_program') LIKE '%crop%'
+          OR LOWER(s.details_json->>'$.sub_program') LIKE '%livestock%'
+          OR LOWER(s.details_json->>'$.sub_program') LIKE '%farming%'
           OR LOWER(s.details_json->>'$.subProgram') LIKE '%agriculture%'
+          OR LOWER(s.details_json->>'$.subProgram') LIKE '%crop%'
+          OR LOWER(s.details_json->>'$.subProgram') LIKE '%livestock%'
+          OR LOWER(s.details_json->>'$.category') LIKE '%agriculture%'
+          OR LOWER(s.details_json->>'$.category') LIKE '%crop%'
+          OR LOWER(s.details_json->>'$.category') LIKE '%livestock%'
+          OR s.details_json->>'$.sub_program' LIKE '%農業%'
+          OR s.details_json->>'$.sub_program' LIKE '%耕種%'
+          OR s.details_json->>'$.sub_program' LIKE '%畜産%'
         )`;
-      } else if (sub.includes('crop')) {
+      } else if (sub.includes('crop') || sub.includes('耕種')) {
         sql += ` AND (
           LOWER(s.sub_program) LIKE '%crop%'
+          OR s.sub_program LIKE '%耕種%'
           OR LOWER(s.details_json->>'$.sub_program') LIKE '%crop%'
           OR LOWER(s.details_json->>'$.subProgram') LIKE '%crop%'
+          OR LOWER(s.details_json->>'$.category') LIKE '%crop%'
           OR LOWER(s.details_json->>'$.agriculture_type') LIKE '%crop%'
+          OR s.details_json->>'$.sub_program' LIKE '%耕種%'
         )`;
-      } else if (sub.includes('livestock')) {
+      } else if (sub.includes('livestock') || sub.includes('畜産')) {
         sql += ` AND (
           LOWER(s.sub_program) LIKE '%livestock%'
+          OR s.sub_program LIKE '%畜産%'
           OR LOWER(s.details_json->>'$.sub_program') LIKE '%livestock%'
           OR LOWER(s.details_json->>'$.subProgram') LIKE '%livestock%'
+          OR LOWER(s.details_json->>'$.category') LIKE '%livestock%'
           OR LOWER(s.details_json->>'$.agriculture_type') LIKE '%livestock%'
+          OR s.details_json->>'$.sub_program' LIKE '%畜産%'
         )`;
       } else {
         sql += ` AND (
           LOWER(s.sub_program) = LOWER(?)
           OR LOWER(s.details_json->>'$.sub_program') = LOWER(?)
           OR LOWER(s.details_json->>'$.subProgram') = LOWER(?)
+          OR LOWER(s.details_json->>'$.category') = LOWER(?)
         )`;
-        params.push(subProgram, subProgram, subProgram);
+        params.push(subProgram, subProgram, subProgram, subProgram);
       }
     }
 
@@ -144,8 +195,8 @@ export async function GET(request: NextRequest) {
         ...s,
         is_read: Boolean(s.is_read),
         date_of_birth: dobStr,
-        program: s.program || details?.program || null,
-        sub_program: s.sub_program || details?.sub_program || null,
+        program: s.program || details?.program || details?.selectedProgram || null,
+        sub_program: s.sub_program || details?.sub_program || details?.subProgram || details?.category || null,
         details_json: details || {},
       };
     });
@@ -183,8 +234,8 @@ export async function POST(request: NextRequest) {
     const isDraft = status === 'draft';
     const finalFullName = (full_name && full_name.trim()) || (isDraft ? 'Untitled Draft' : 'Untitled Student');
     const finalPhone = (phone && phone.trim()) || '—';
-    const finalProgram = body.program || body.selectedProgram || details?.program || null;
-    const finalSubProgram = body.sub_program || body.subProgram || details?.sub_program || details?.subProgram || null;
+    const finalProgram = body.program || body.selectedProgram || details?.program || details?.selectedProgram || null;
+    const finalSubProgram = body.sub_program || body.subProgram || details?.sub_program || details?.subProgram || details?.category || null;
 
     // Sanitize date_of_birth and gender safely to prevent MySQL DATE / ENUM truncation errors
     const finalDob = sanitizeDbDate(date_of_birth || details?.dob || details?.dob_japanese);

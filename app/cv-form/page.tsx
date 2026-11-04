@@ -4,6 +4,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import PhotoUploadField from '@/components/PhotoUploadField';
 import ProgramCategorySection from '@/components/ProgramCategorySection';
+import SkillTestSection from '@/components/SkillTestSection';
+import { normalizeProgramId } from '@/lib/programs';
 import EducationHistorySection, { INITIAL_EDUCATION_ROWS } from '@/components/EducationHistorySection';
 import WorkHistorySection, { INITIAL_WORK_ROWS } from '@/components/WorkHistorySection';
 import FamilyInfoSection, { INITIAL_FAMILY_ROWS } from '@/components/FamilyInfoSection';
@@ -101,6 +103,7 @@ export default function FixedStudentCvForm() {
 
   // Section 3: 学歴 / শিক্ষাগত যোগ্যতা (Educational Background)
   const [educationHistory, setEducationHistory] = useState<EducationEntry[]>(INITIAL_EDUCATION_ROWS);
+  const [skillTests, setSkillTests] = useState<Record<string, string>>({});
 
   // Section 4: その他言語 / অন্যান্য ভাষা (Other Languages)
   const [languageBengali, setLanguageBengali] = useState('');
@@ -487,6 +490,7 @@ export default function FixedStudentCvForm() {
             future_plan_original_bn: futurePlanOriginalBn.trim(),
             japan_visa_applied_before: japanVisaAppliedBefore,
             japan_visa_type_applied: japanVisaTypeApplied.trim(),
+            skill_tests: skillTests,
             education_history: educationHistory.filter(
               (item) => item.school_name.trim() || item.start_year_month || item.end_year_month || item.major_subject || item.qualification
             ),
@@ -771,6 +775,7 @@ export default function FixedStudentCvForm() {
             japan_visa_applied_before: japanVisaAppliedBefore,
             japan_visa_type_applied: japanVisaTypeApplied.trim(),
             // Section 3: 学歴 / শিক্ষাগত যোগ্যতা
+            skill_tests: skillTests,
             education_history: educationHistory.filter(
               (item) => item.school_name.trim() || item.start_year_month || item.end_year_month || item.major_subject || item.qualification
             ),

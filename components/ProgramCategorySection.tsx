@@ -1,7 +1,12 @@
 'use client';
 
 import React from 'react';
-import { PROGRAM_OPTIONS, getSubPrograms } from '@/lib/programs';
+import {
+  PROGRAM_OPTIONS,
+  getSubPrograms,
+  normalizeProgramId,
+  isSubProgramMatching,
+} from '@/lib/programs';
 import { Layers, CheckCircle2 } from 'lucide-react';
 
 interface ProgramCategorySectionProps {
@@ -17,10 +22,11 @@ export default function ProgramCategorySection({
   onChangeProgram,
   onChangeSubProgram,
 }: ProgramCategorySectionProps) {
-  const currentSubPrograms = getSubPrograms(program);
+  const normalizedProg = normalizeProgramId(program);
+  const currentSubPrograms = getSubPrograms(normalizedProg);
 
   const handleProgramSelect = (selectedProg: string) => {
-    if (program === selectedProg) {
+    if (normalizedProg === selectedProg) {
       onChangeProgram('');
       onChangeSubProgram('');
       return;
@@ -143,7 +149,7 @@ export default function ProgramCategorySection({
           }}
         >
           {PROGRAM_OPTIONS.map((opt) => {
-            const isSelected = program === opt.id;
+            const isSelected = normalizedProg === opt.id;
             return (
               <button
                 key={opt.id}
@@ -202,7 +208,7 @@ export default function ProgramCategorySection({
           })}
         </div>
 
-        {program && (
+        {normalizedProg && (
           <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'flex-end' }}>
             <button
               type="button"
@@ -227,7 +233,7 @@ export default function ProgramCategorySection({
       </div>
 
       {/* Sub-Program / Field Selection */}
-      {program && (
+      {normalizedProg && (
         <div
           style={{
             padding: '18px',
@@ -246,7 +252,7 @@ export default function ProgramCategorySection({
               marginBottom: '10px',
             }}
           >
-            2. 職種・分野・専攻 / ক্ষেত্র বা কোর্স (Category under {program})
+            2. 職種・分野・専攻 / ক্ষেত্র বা কোর্স (Category under {normalizedProg})
           </label>
 
           <div
@@ -259,9 +265,7 @@ export default function ProgramCategorySection({
           >
             {currentSubPrograms.map((sub) => {
               const hasSubOptions = Array.isArray(sub.subOptions) && sub.subOptions.length > 0;
-              const isSelected = hasSubOptions
-                ? (subProgram === sub.id || subProgram.startsWith(`${sub.id} - `) || subProgram.includes('Farming'))
-                : subProgram === sub.id;
+              const isSelected = isSubProgramMatching(subProgram, sub.id);
 
               const handleCategoryClick = () => {
                 if (isSelected) {
@@ -333,11 +337,7 @@ export default function ProgramCategorySection({
           {/* Nested Sub-options under SSW > Agriculture */}
           {(() => {
             const agriOption = currentSubPrograms.find((s) => s.id === 'Agriculture' && Array.isArray(s.subOptions));
-            const isAgriActive = agriOption && (
-              subProgram === 'Agriculture' ||
-              subProgram.startsWith('Agriculture - ') ||
-              subProgram.includes('Farming')
-            );
+            const isAgriActive = agriOption && isSubProgramMatching(subProgram, 'Agriculture');
 
             if (!isAgriActive || !agriOption || !agriOption.subOptions) return null;
 
@@ -370,10 +370,7 @@ export default function ProgramCategorySection({
                   }}
                 >
                   {agriOption.subOptions.map((subOpt) => {
-                    const isSubOptSelected =
-                      subProgram === subOpt.id ||
-                      (subOpt.id.includes('Crop') && (subProgram === 'Agriculture' || subProgram.includes('Crop'))) ||
-                      (subOpt.id.includes('Livestock') && subProgram.includes('Livestock'));
+                    const isSubOptSelected = isSubProgramMatching(subProgram, subOpt.id);
 
                     return (
                       <button

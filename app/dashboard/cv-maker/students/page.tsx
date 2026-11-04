@@ -28,7 +28,8 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { StudentCv } from '@/types/cv';
-import { PROGRAM_OPTIONS, getSubPrograms, formatProgramBadge } from '@/lib/programs';
+import { PROGRAM_OPTIONS, getSubPrograms, formatProgramBadge, normalizeProgramId } from '@/lib/programs';
+import { getSkillTestsForCategory, formatSkillTestStatus } from '@/lib/skill-tests';
 import styles from '../cv-maker.module.css';
 import { formatJapaneseBirthDate, formatLanguageDisplay, normalizeCandidateAge } from '@/lib/cv-normalizer';
 import {
@@ -577,7 +578,7 @@ export default function StudentListPage() {
   const handleProgramChange = (prog: string) => {
     setSelectedProgram(prog);
     if (prog) {
-      const validSubs = getSubPrograms(prog).map((s) => s.id);
+      const validSubs = getSubPrograms(prog).flatMap((s) => [s.id, ...(s.subOptions?.map((o) => o.id) || [])]);
       if (selectedSubProgram && !validSubs.includes(selectedSubProgram)) {
         setSelectedSubProgram('');
       }
@@ -2648,6 +2649,186 @@ export default function StudentListPage() {
                     </table>
                   </div>
                 </div>
+
+                {/* SECTION: 技能試験 / Skill Test (Only for SSW) */}
+                {(() => {
+                  const studentProg = normalizeProgramId(activeStudent.program || activeStudent.details_json?.program);
+                  if (studentProg !== 'SSW') return null;
+                  const studentSubProg =
+                    activeStudent.sub_program ||
+                    activeStudent.details_json?.sub_program ||
+                    activeStudent.details_json?.subProgram ||
+                    activeStudent.details_json?.category ||
+                    '';
+                  const skillTestsList = getSkillTestsForCategory('SSW', studentSubProg);
+                  if (!skillTestsList || skillTestsList.length === 0) return null;
+
+                  return (
+                    <div
+                      className="cv-section"
+                      data-cv-section
+                      style={{
+                        marginBottom: '8px',
+                        breakInside: 'avoid',
+                        pageBreakInside: 'avoid',
+                      }}
+                    >
+                      <div
+                        className="cv-section-title"
+                        data-cv-section-title
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          fontSize: '13.5px',
+                          fontWeight: 800,
+                          color: '#c00000',
+                          marginBottom: '3px',
+                          letterSpacing: '0.2px',
+                          breakAfter: 'avoid',
+                          pageBreakAfter: 'avoid',
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: '4px',
+                            height: '14px',
+                            background: '#c00000',
+                            borderRadius: '2px',
+                            display: 'inline-block',
+                            flexShrink: 0,
+                          }}
+                        />
+                        <span>
+                          {printVersion === 'japanese' ? '技能試験' : '技能試験 / স্কিল টেস্ট (Skill Test)'}
+                        </span>
+                      </div>
+
+                      <div
+                        style={{
+                          border: '1.5px solid #2b5585',
+                          background: '#ffffff',
+                          width: '100%',
+                          boxSizing: 'border-box',
+                        }}
+                      >
+                        <table
+                          style={{
+                            width: '100%',
+                            borderCollapse: 'collapse',
+                            tableLayout: 'fixed',
+                            fontSize: '11.5px',
+                          }}
+                        >
+                          <colgroup>
+                            <col style={{ width: '65%' }} />
+                            <col style={{ width: '35%' }} />
+                          </colgroup>
+                          <thead>
+                            <tr style={{ background: '#e8f0fe', borderBottom: '1px solid #2b5585' }}>
+                              <th
+                                style={{
+                                  padding: '5px 8px',
+                                  fontWeight: 700,
+                                  color: '#1f3864',
+                                  borderRight: '1px solid #2b5585',
+                                  textAlign: 'center',
+                                  fontSize: '11px',
+                                  lineHeight: 1.2,
+                                }}
+                              >
+                                <div>{printVersion === 'japanese' ? '試験名' : '試験名 / Test Name'}</div>
+                                {printVersion === 'student' && (
+                                  <div style={{ fontSize: '9.5px', color: '#475569' }}>পরীক্ষার নাম</div>
+                                )}
+                              </th>
+                              <th
+                                style={{
+                                  padding: '5px 8px',
+                                  fontWeight: 700,
+                                  color: '#1f3864',
+                                  textAlign: 'center',
+                                  fontSize: '11px',
+                                  lineHeight: 1.2,
+                                }}
+                              >
+                                <div>{printVersion === 'japanese' ? '合否・受験状況' : '合否・受験状況 / Status'}</div>
+                                {printVersion === 'student' && (
+                                  <div style={{ fontSize: '9.5px', color: '#475569' }}>ফলাফল ও স্থিতি</div>
+                                )}
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {skillTestsList.map((testItem, tIdx) => {
+                              const rawVal =
+                                activeStudent.details_json?.skill_tests?.[testItem.id] ||
+                                activeStudent.details_json?.[testItem.id] ||
+                                testItem.defaultOption ||
+                                '';
+                              const statusDisplay = formatSkillTestStatus(rawVal, printVersion);
+                              const isPassed =
+                                rawVal.includes('合格') || rawVal.toLowerCase().includes('pass');
+
+                              return (
+                                <tr
+                                  key={testItem.id}
+                                  style={{
+                                    borderBottom:
+                                      tIdx === skillTestsList.length - 1 ? 'none' : '1px solid #2b5585',
+                                  }}
+                                >
+                                  <td
+                                    style={{
+                                      padding: '5px 8px',
+                                      fontWeight: 700,
+                                      color: '#000000',
+                                      borderRight: '1px solid #2b5585',
+                                      fontSize: '11.5px',
+                                      lineHeight: 1.3,
+                                    }}
+                                  >
+                                    {printVersion === 'japanese' ? (
+                                      <div>{testItem.nameJp}</div>
+                                    ) : (
+                                      <div>
+                                        <div style={{ fontWeight: 700, color: '#0f172a' }}>
+                                          {testItem.nameEn}
+                                        </div>
+                                        <div
+                                          style={{
+                                            fontSize: '10.5px',
+                                            color: '#475569',
+                                            fontWeight: 600,
+                                            marginTop: '1px',
+                                          }}
+                                        >
+                                          {testItem.nameJp}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td
+                                    style={{
+                                      padding: '5px 8px',
+                                      textAlign: 'center',
+                                      fontWeight: 800,
+                                      fontSize: '12px',
+                                      color: isPassed ? '#15803d' : '#1e3a8a',
+                                      background: isPassed ? '#f0fdf4' : '#f8fafc',
+                                    }}
+                                  >
+                                    {statusDisplay}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* SECTION 4: その他言語 / অন্যান্য ভাষা (Natural Flow on Page 1, Unbreakable) */}
                 <div

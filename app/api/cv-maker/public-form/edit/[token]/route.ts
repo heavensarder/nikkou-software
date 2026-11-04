@@ -61,8 +61,8 @@ export async function GET(
     }
     student.details_json = details || {};
 
-    student.program = student.program || student.details_json?.program || null;
-    student.sub_program = student.sub_program || student.details_json?.sub_program || null;
+    student.program = student.program || student.details_json?.program || student.details_json?.selectedProgram || null;
+    student.sub_program = student.sub_program || student.details_json?.sub_program || student.details_json?.subProgram || student.details_json?.category || null;
     if (student.details_json) {
       student.details_json.program = student.program;
       student.details_json.sub_program = student.sub_program;
@@ -146,8 +146,8 @@ export async function PUT(
       (mergedDetails.furigana && mergedDetails.furigana.trim()) ||
       'Untitled Applicant';
     const finalPhone = (phone && phone.trim()) || mergedDetails.phone || '—';
-    const finalProgram = program || mergedDetails.program || null;
-    const finalSubProgram = sub_program || mergedDetails.sub_program || null;
+    const finalProgram = program || body.selectedProgram || mergedDetails.program || mergedDetails.selectedProgram || null;
+    const finalSubProgram = sub_program || body.subProgram || mergedDetails.sub_program || mergedDetails.subProgram || mergedDetails.category || null;
 
     if (mergedDetails.language_bengali) {
       if (mergedDetails.language_bengali.includes('出来る')) mergedDetails.language_bengali = '可 / পারি';

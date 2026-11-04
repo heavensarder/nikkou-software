@@ -37,8 +37,8 @@ export async function GET(
       }
     }
 
-    student.program = student.program || student.details_json?.program || null;
-    student.sub_program = student.sub_program || student.details_json?.sub_program || null;
+    student.program = student.program || student.details_json?.program || student.details_json?.selectedProgram || null;
+    student.sub_program = student.sub_program || student.details_json?.sub_program || student.details_json?.subProgram || student.details_json?.category || null;
     if (student.details_json) {
       student.details_json.program = student.program;
       student.details_json.sub_program = student.sub_program;
@@ -90,8 +90,8 @@ export async function PUT(
     const isDraft = status === 'draft';
     const finalFullName = (full_name && full_name.trim()) || (isDraft ? 'Untitled Draft' : 'Untitled Student');
     const finalPhone = (phone && phone.trim()) || '—';
-    const finalProgram = body.program || body.selectedProgram || details?.program || null;
-    const finalSubProgram = body.sub_program || body.subProgram || details?.sub_program || details?.subProgram || null;
+    const finalProgram = body.program || body.selectedProgram || details?.program || details?.selectedProgram || null;
+    const finalSubProgram = body.sub_program || body.subProgram || details?.sub_program || details?.subProgram || details?.category || null;
 
     // Sanitize date_of_birth and gender safely to prevent MySQL DATE / ENUM truncation errors
     const finalDob = sanitizeDbDate(date_of_birth || details?.dob || details?.dob_japanese);
