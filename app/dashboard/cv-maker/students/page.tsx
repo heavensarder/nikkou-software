@@ -143,6 +143,7 @@ export default function StudentListPage() {
   const [newlyArrivedIds, setNewlyArrivedIds] = useState<Set<number>>(new Set());
   const [newStudentNotification, setNewStudentNotification] = useState<StudentCv | null>(null);
   const isFirstLoadRef = useRef(true);
+  const isFetchingRef = useRef(false);
   const knownStudentIdsRef = useRef<Set<number>>(new Set());
 
   // Load unread new applications from persistent storage on mount
@@ -474,6 +475,8 @@ export default function StudentListPage() {
     subVal = selectedSubProgram,
     isSilent = false
   ) => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
     try {
       if (!isSilent) {
         setLoading(true);
@@ -551,6 +554,7 @@ export default function StudentListPage() {
     } finally {
       setLoading(false);
       setIsRefreshing(false);
+      isFetchingRef.current = false;
     }
   };
 
@@ -569,7 +573,7 @@ export default function StudentListPage() {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
         fetchStudents(searchQuery, selectedStatus, selectedProgram, selectedSubProgram, true);
       }
-    }, 3000);
+    }, 25000);
 
     const handleFocusSync = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
@@ -587,7 +591,7 @@ export default function StudentListPage() {
       window.removeEventListener('online', handleFocusSync);
       document.removeEventListener('visibilitychange', handleFocusSync);
     };
-  }, [searchQuery, selectedStatus, selectedProgram, selectedSubProgram, activeStudent]);
+  }, [searchQuery, selectedStatus, selectedProgram, selectedSubProgram]);
 
   const handleProgramChange = (prog: string) => {
     setSelectedProgram(prog);

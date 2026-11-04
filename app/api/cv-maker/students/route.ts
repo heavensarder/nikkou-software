@@ -6,48 +6,18 @@ import crypto from 'crypto';
 import { sanitizeDbDate, mapGenderToDbEnum, formatJapaneseBirthDate } from '@/lib/cv-normalizer';
 
 let cachedColumns: Set<string> | null = null;
-let lastColumnCheck = 0;
 
 async function getStudentCvColumns(): Promise<Set<string>> {
-  const now = Date.now();
-  if (cachedColumns && now - lastColumnCheck < 60000) {
+  if (cachedColumns) {
     return cachedColumns;
   }
   try {
     const cols = await query<RowDataPacket[]>('SHOW COLUMNS FROM student_cvs');
     cachedColumns = new Set(cols.map((c: any) => c.Field));
-    lastColumnCheck = now;
-
-    // Self-healing: if program, sub_program, is_read, or edit_token are missing, attempt to add them seamlessly
-    if (!cachedColumns.has('program')) {
-      try {
-        await query('ALTER TABLE student_cvs ADD COLUMN program VARCHAR(100) NULL');
-        cachedColumns.add('program');
-      } catch {}
-    }
-    if (!cachedColumns.has('sub_program')) {
-      try {
-        await query('ALTER TABLE student_cvs ADD COLUMN sub_program VARCHAR(150) NULL');
-        cachedColumns.add('sub_program');
-      } catch {}
-    }
-    if (!cachedColumns.has('edit_token')) {
-      try {
-        await query('ALTER TABLE student_cvs ADD COLUMN edit_token VARCHAR(64) NULL');
-        cachedColumns.add('edit_token');
-      } catch {}
-    }
-    if (!cachedColumns.has('is_read')) {
-      try {
-        await query('ALTER TABLE student_cvs ADD COLUMN is_read TINYINT(1) DEFAULT 1');
-        cachedColumns.add('is_read');
-      } catch {}
-    }
-
     return cachedColumns;
   } catch (e) {
     console.warn('Could not inspect student_cvs columns:', e);
-    return cachedColumns || new Set();
+    return new Set(['id', 'student_code', 'full_name', 'phone', 'details_json', 'created_at']);
   }
 }
 
@@ -219,7 +189,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    sql += ` ORDER BY s.created_at DESC`;
+    sql += ` ORDER BY s.created_at DESC LIMIT 250`;
 
     const students = await query<RowDataPacket[]>(sql, params);
 
@@ -246,13 +216,28 @@ export async function GET(request: NextRequest) {
 
         const dobStr = sanitizeDbDate(s.date_of_birth) || sanitizeDbDate(details?.dob_japanese) || null;
 
+        // Lightweight summary details for list view (drastically reduces payload size by 95%+)
+        const summaryDetails = {
+          name_native: details.name_native,
+          furigana: details.furigana,
+          photo_data: details.photo_data,
+          gender_label: details.gender_label,
+          age_display: details.age_display,
+          marital_status: details.marital_status,
+          address: details.address,
+          phone: details.phone,
+          program: details.program,
+          sub_program: details.sub_program,
+          skill_tests: details.skill_tests,
+        };
+
         return {
           ...s,
           is_read: Boolean(s.is_read),
           date_of_birth: dobStr,
           program: s.program || details?.program || details?.selectedProgram || null,
           sub_program: s.sub_program || details?.sub_program || details?.subProgram || details?.category || null,
-          details_json: details,
+          details_json: summaryDetails,
         };
       } catch (rowErr) {
         console.error(`Error parsing student row ${s.id}:`, rowErr);

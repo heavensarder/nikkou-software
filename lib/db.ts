@@ -7,7 +7,7 @@ declare global {
   var __mysqlPoolConfigVersion: number | undefined;
 }
 
-const POOL_CONFIG_VERSION = 2;
+const POOL_CONFIG_VERSION = 3;
 
 if (global.__mysqlPool && global.__mysqlPoolConfigVersion !== POOL_CONFIG_VERSION) {
   try {
@@ -23,9 +23,9 @@ const poolConfig = {
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'nikkou-software',
   waitForConnections: true,
-  connectionLimit: 10,
-  maxIdle: 10,
-  idleTimeout: 60000,
+  connectionLimit: 25,
+  maxIdle: 20,
+  idleTimeout: 30000,
   queueLimit: 0,
   enableKeepAlive: true,
   keepAliveInitialDelay: 0,
