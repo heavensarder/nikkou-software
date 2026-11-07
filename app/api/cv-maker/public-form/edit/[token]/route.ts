@@ -148,6 +148,8 @@ export async function PUT(
     const finalPhone = (phone && phone.trim()) || mergedDetails.phone || '—';
     const finalProgram = program || body.selectedProgram || mergedDetails.program || mergedDetails.selectedProgram || null;
     const finalSubProgram = sub_program || body.subProgram || mergedDetails.sub_program || mergedDetails.subProgram || mergedDetails.category || null;
+    mergedDetails.program = finalProgram;
+    mergedDetails.sub_program = finalSubProgram;
 
     if (mergedDetails.language_bengali) {
       if (mergedDetails.language_bengali.includes('出来る')) mergedDetails.language_bengali = '可 / পারি';

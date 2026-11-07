@@ -132,58 +132,183 @@ export function normalizeProgramId(prog?: string | null): string {
   if (!prog) return '';
   const trimmed = prog.trim();
   const lower = trimmed.toLowerCase();
-  if (lower === 'ssw' || lower.includes('特定技能') || lower.includes('specified skilled')) return 'SSW';
-  if (lower.includes('titp') || lower.includes('esd') || lower.includes('技能実習') || lower.includes('technical intern')) return 'TITP/ESD';
-  if (lower.includes('student') || lower.includes('留学') || lower.includes('study')) return 'Student';
-  const direct = PROGRAM_OPTIONS.find((p) => p.id.toLowerCase() === lower || p.label.toLowerCase() === lower);
+  if (
+    lower === 'ssw' ||
+    lower.includes('ssw') ||
+    lower.includes('特定技能') ||
+    lower.includes('specified skilled') ||
+    lower.includes('এসএসডব্লিউ')
+  ) {
+    return 'SSW';
+  }
+  if (
+    lower.includes('titp') ||
+    lower.includes('esd') ||
+    lower.includes('技能実習') ||
+    lower.includes('実習') ||
+    lower.includes('technical intern') ||
+    lower.includes('টিআইটিপি') ||
+    lower.includes('ইএসডি')
+  ) {
+    return 'TITP/ESD';
+  }
+  if (
+    lower.includes('student') ||
+    lower.includes('留学') ||
+    lower.includes('study') ||
+    lower.includes('স্টুডেন্ট')
+  ) {
+    return 'Student';
+  }
+  const direct = PROGRAM_OPTIONS.find(
+    (p) => p.id.toLowerCase() === lower || p.label.toLowerCase() === lower
+  );
   if (direct) return direct.id;
   return trimmed;
 }
 
-export function isSubProgramMatching(candidate: string | null | undefined, targetId: string): boolean {
-  if (!candidate || !targetId) return false;
+export function isProgramMatching(
+  candidate: string | null | undefined,
+  targetProgram: string | null | undefined
+): boolean {
+  if (!targetProgram || !targetProgram.trim()) return true;
+  if (!candidate || !candidate.trim()) return false;
+  const normCandidate = normalizeProgramId(candidate);
+  const normTarget = normalizeProgramId(targetProgram);
+  if (!normCandidate || !normTarget) return false;
+  return normCandidate.toLowerCase() === normTarget.toLowerCase();
+}
+
+export function isSubProgramMatching(
+  candidate: string | null | undefined,
+  targetId: string | null | undefined
+): boolean {
+  if (!targetId || !targetId.trim()) return true;
+  if (!candidate || !candidate.trim()) return false;
   const c = candidate.trim().toLowerCase();
   const t = targetId.trim().toLowerCase();
-  if (c === t) return true;
 
-  // General Crop Farming matching
-  if (t.includes('crop') || t.includes('耕種')) {
-    return c.includes('crop') || c.includes('耕種');
+  // 1. Specific SSW Agriculture Sub-Options MUST be checked FIRST
+  // because their IDs ('Agriculture - General Crop Farming', 'Agriculture - General Livestock Farming')
+  // also contain the word 'agriculture'.
+  if (t.includes('crop') || t.includes('耕種') || t.includes('ফসল')) {
+    return (
+      (c.includes('crop') || c.includes('耕種') || c.includes('ফসল')) &&
+      !c.includes('livestock') &&
+      !c.includes('畜産')
+    );
   }
 
-  // General Livestock Farming matching
-  if (t.includes('livestock') || t.includes('畜産')) {
-    return c.includes('livestock') || c.includes('畜産');
+  if (t.includes('livestock') || t.includes('畜産') || t.includes('গবাদিপশু')) {
+    return (
+      (c.includes('livestock') || c.includes('畜産') || c.includes('গবাদিপশু')) &&
+      !c.includes('crop') &&
+      !c.includes('耕種')
+    );
   }
 
-  // SSW Agriculture umbrella matching
-  if (t === 'agriculture') {
+  // 2. Umbrella Agriculture option ('Agriculture' / 'Agriculture (All)')
+  // Matches generic 'Agriculture' as well as both General Crop Farming and General Livestock Farming
+  if (
+    t === 'agriculture' ||
+    t.includes('agriculture') ||
+    t.includes('農業') ||
+    t.includes('কৃষি')
+  ) {
     return (
       c === 'agriculture' ||
+      c.includes('agriculture') ||
       c.includes('crop') ||
       c.includes('livestock') ||
       c.includes('farming') ||
       c.includes('農業') ||
       c.includes('耕種') ||
-      c.includes('畜産')
+      c.includes('畜産') ||
+      c.includes('কৃষি') ||
+      c.includes('ফসল') ||
+      c.includes('গবাদিপশু')
     );
   }
 
-  // Other subprograms
-  if (t.includes('nursing') || t.includes('caregiver')) {
-    return c.includes('nursing') || c.includes('caregiver') || c.includes('介護');
+  if (c === t) return true;
+
+  // 3. Other SSW & TITP/ESD sub-programs
+  if (t.includes('nursing') || t.includes('caregiver') || t.includes('介護')) {
+    return (
+      c.includes('nursing') ||
+      c.includes('caregiver') ||
+      c.includes('介護') ||
+      c.includes('নার্সিং') ||
+      c.includes('কেয়ারগিভার')
+    );
   }
-  if (t.includes('construction')) {
-    return c.includes('construction') || c.includes('建設');
+  if (t.includes('construction') || t.includes('建設')) {
+    return (
+      c.includes('construction') ||
+      c.includes('建設') ||
+      c.includes('নির্মাণ')
+    );
   }
-  if (t.includes('cleaning')) {
-    return c.includes('cleaning') || c.includes('ビルクリーニング');
+  if (t.includes('cleaning') || t.includes('ビルクリーニング')) {
+    return (
+      c.includes('cleaning') ||
+      c.includes('ビルクリーニング') ||
+      c.includes('ক্লিনিং')
+    );
   }
-  if (t.includes('driver')) {
-    return c.includes('driver') || c.includes('ドライバー');
+  if (t.includes('driver') || t.includes('ドライバー') || t.includes('自動車運送')) {
+    return (
+      c.includes('driver') ||
+      c.includes('ドライバー') ||
+      c.includes('自動車運送') ||
+      c.includes('ড্রাইভার')
+    );
   }
-  if (t.includes('restaurant') || t.includes('food')) {
-    return c.includes('restaurant') || c.includes('food') || c.includes('外食');
+  if (
+    t.includes('restaurant') ||
+    t.includes('food') ||
+    t.includes('外食') ||
+    t.includes('食品製造')
+  ) {
+    return (
+      c.includes('restaurant') ||
+      c.includes('food') ||
+      c.includes('外食') ||
+      c.includes('食品製造') ||
+      c.includes('রেস্টুরেন্ট') ||
+      c.includes('খাদ্য')
+    );
+  }
+
+  // 4. Student sub-programs
+  if (t.includes('language school') || t.includes('日本語学校')) {
+    return (
+      c.includes('language school') ||
+      c.includes('日本語学校') ||
+      c.includes('ভাষা স্কুল')
+    );
+  }
+  if (t.includes('under university') || t.includes('大学別科')) {
+    return (
+      c.includes('under university') ||
+      c.includes('大学別科') ||
+      c.includes('বিশ্ববিদ্যালয়ের অধীনে')
+    );
+  }
+  if (
+    t.includes('honours') ||
+    t.includes('master') ||
+    t.includes('学士') ||
+    t.includes('修士')
+  ) {
+    return (
+      c.includes('honours') ||
+      c.includes('master') ||
+      c.includes('学士') ||
+      c.includes('修士') ||
+      c.includes('অনার্স') ||
+      c.includes('মাস্টার্স')
+    );
   }
 
   return false;

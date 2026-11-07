@@ -4,6 +4,7 @@ import { COOKIE_NAME, verifySessionToken } from '@/lib/auth';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import crypto from 'crypto';
 import { sanitizeDbDate, mapGenderToDbEnum, formatJapaneseBirthDate } from '@/lib/cv-normalizer';
+import { isProgramMatching, isSubProgramMatching } from '@/lib/programs';
 
 let cachedColumns: Set<string> | null = null;
 
@@ -38,8 +39,18 @@ export async function GET(request: NextRequest) {
     const searchQuery = searchParams.get('q') || '';
     const status = searchParams.get('status') || '';
     const formId = searchParams.get('form_id') || '';
-    const program = searchParams.get('program') || '';
-    const subProgram = searchParams.get('sub_program') || searchParams.get('category') || '';
+    const rawProgram = searchParams.get('program') || '';
+    const rawSubProgram = searchParams.get('sub_program') || searchParams.get('category') || '';
+
+    let program = rawProgram.trim();
+    let subProgram = rawSubProgram.trim();
+    if (subProgram.includes(':::')) {
+      const [extractedProg, extractedSub] = subProgram.split(':::');
+      if (!program && extractedProg) {
+        program = extractedProg.trim();
+      }
+      subProgram = (extractedSub || '').trim();
+    }
 
     const cols = await getStudentCvColumns();
     const hasProgramCol = cols.has('program');
@@ -98,44 +109,66 @@ export async function GET(request: NextRequest) {
       params.push(Number(formId));
     }
 
-    if (program) {
+    // NOTE: Never run LIKE '%ssw%' or LIKE '%crop%' against CAST(s.details_json AS CHAR)
+    // because details_json contains base64 photo_data where short 3-4 character sequences
+    // appear randomly. Instead, filter against s.program / s.sub_program columns (and allow
+    // NULL/empty rows to be verified after JSON parsing via isProgramMatching / isSubProgramMatching).
+    if (program && hasProgramCol) {
       const p = program.toLowerCase();
       if (p.includes('ssw') || p.includes('特定技能')) {
         sql += ` AND (
           LOWER(s.program) LIKE '%ssw%'
           OR s.program LIKE '%特定技能%'
-          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%ssw%'
-          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%ssw%'
-          OR CAST(s.details_json AS CHAR) LIKE '%特定技能%'
+          OR s.program IS NULL
+          OR s.program = ''
         )`;
       } else if (p.includes('titp') || p.includes('esd') || p.includes('実習')) {
         sql += ` AND (
           LOWER(s.program) LIKE '%titp%'
           OR LOWER(s.program) LIKE '%esd%'
           OR s.program LIKE '%実習%'
-          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%titp%'
-          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%titp%'
+          OR s.program IS NULL
+          OR s.program = ''
         )`;
       } else if (p.includes('student') || p.includes('留学')) {
         sql += ` AND (
           LOWER(s.program) LIKE '%student%'
           OR s.program LIKE '%留学%'
-          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%student%'
-          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%student%'
+          OR s.program IS NULL
+          OR s.program = ''
         )`;
       } else {
         sql += ` AND (
           LOWER(s.program) = LOWER(?)
-          OR LOWER(CAST(s.details_json AS CHAR)) = LOWER(?)
-          OR LOWER(CAST(s.details_json AS CHAR)) = LOWER(?)
+          OR s.program IS NULL
+          OR s.program = ''
         )`;
-        params.push(program, program, program);
+        params.push(program);
       }
     }
 
-    if (subProgram) {
+    if (subProgram && hasSubProgCol) {
       const sub = subProgram.toLowerCase();
-      if (sub === 'agriculture' || sub.includes('agriculture') || sub.includes('all')) {
+      // IMPORTANT: Check specific sub-options (Crop & Livestock) BEFORE generic 'agriculture'
+      // because 'Agriculture - General Crop Farming' and 'Agriculture - General Livestock Farming'
+      // both contain the substring 'agriculture'.
+      if (sub.includes('crop') || sub.includes('耕種') || sub.includes('ফসল')) {
+        sql += ` AND (
+          LOWER(s.sub_program) LIKE '%crop%'
+          OR s.sub_program LIKE '%耕種%'
+          OR s.sub_program LIKE '%ফসল%'
+          OR s.sub_program IS NULL
+          OR s.sub_program = ''
+        )`;
+      } else if (sub.includes('livestock') || sub.includes('畜産') || sub.includes('গবাদিপশু')) {
+        sql += ` AND (
+          LOWER(s.sub_program) LIKE '%livestock%'
+          OR s.sub_program LIKE '%畜産%'
+          OR s.sub_program LIKE '%গবাদিপশু%'
+          OR s.sub_program IS NULL
+          OR s.sub_program = ''
+        )`;
+      } else if (sub === 'agriculture' || sub.includes('agriculture') || sub.includes('農業') || sub.includes('কৃষি')) {
         sql += ` AND (
           LOWER(s.sub_program) LIKE '%agriculture%'
           OR LOWER(s.sub_program) LIKE '%crop%'
@@ -144,48 +177,12 @@ export async function GET(request: NextRequest) {
           OR s.sub_program LIKE '%農業%'
           OR s.sub_program LIKE '%耕種%'
           OR s.sub_program LIKE '%畜産%'
-          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%agriculture%'
-          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%crop%'
-          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%livestock%'
-          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%farming%'
-          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%agriculture%'
-          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%crop%'
-          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%livestock%'
-          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%agriculture%'
-          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%crop%'
-          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%livestock%'
-          OR CAST(s.details_json AS CHAR) LIKE '%農業%'
-          OR CAST(s.details_json AS CHAR) LIKE '%耕種%'
-          OR CAST(s.details_json AS CHAR) LIKE '%畜産%'
+          OR s.sub_program LIKE '%কৃষি%'
+          OR s.sub_program LIKE '%ফসল%'
+          OR s.sub_program LIKE '%গবাদিপশু%'
+          OR s.sub_program IS NULL
+          OR s.sub_program = ''
         )`;
-      } else if (sub.includes('crop') || sub.includes('耕種')) {
-        sql += ` AND (
-          LOWER(s.sub_program) LIKE '%crop%'
-          OR s.sub_program LIKE '%耕種%'
-          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%crop%'
-          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%crop%'
-          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%crop%'
-          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%crop%'
-          OR CAST(s.details_json AS CHAR) LIKE '%耕種%'
-        )`;
-      } else if (sub.includes('livestock') || sub.includes('畜産')) {
-        sql += ` AND (
-          LOWER(s.sub_program) LIKE '%livestock%'
-          OR s.sub_program LIKE '%畜産%'
-          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%livestock%'
-          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%livestock%'
-          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%livestock%'
-          OR LOWER(CAST(s.details_json AS CHAR)) LIKE '%livestock%'
-          OR CAST(s.details_json AS CHAR) LIKE '%畜産%'
-        )`;
-      } else {
-        sql += ` AND (
-          LOWER(s.sub_program) = LOWER(?)
-          OR LOWER(CAST(s.details_json AS CHAR)) = LOWER(?)
-          OR LOWER(CAST(s.details_json AS CHAR)) = LOWER(?)
-          OR LOWER(CAST(s.details_json AS CHAR)) = LOWER(?)
-        )`;
-        params.push(subProgram, subProgram, subProgram, subProgram);
       }
     }
 
@@ -215,6 +212,8 @@ export async function GET(request: NextRequest) {
         }
 
         const dobStr = sanitizeDbDate(s.date_of_birth) || sanitizeDbDate(details?.dob_japanese) || null;
+        const resolvedProgram = s.program || details?.program || details?.selectedProgram || null;
+        const resolvedSubProgram = s.sub_program || details?.sub_program || details?.subProgram || details?.category || null;
 
         // Lightweight summary details for list view (drastically reduces payload size by 95%+)
         const summaryDetails = {
@@ -226,8 +225,8 @@ export async function GET(request: NextRequest) {
           marital_status: details.marital_status,
           address: details.address,
           phone: details.phone,
-          program: details.program,
-          sub_program: details.sub_program,
+          program: resolvedProgram,
+          sub_program: resolvedSubProgram,
           skill_tests: details.skill_tests,
         };
 
@@ -235,8 +234,8 @@ export async function GET(request: NextRequest) {
           ...s,
           is_read: Boolean(s.is_read),
           date_of_birth: dobStr,
-          program: s.program || details?.program || details?.selectedProgram || null,
-          sub_program: s.sub_program || details?.sub_program || details?.subProgram || details?.category || null,
+          program: resolvedProgram,
+          sub_program: resolvedSubProgram,
           details_json: summaryDetails,
         };
       } catch (rowErr) {
@@ -252,7 +251,46 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    return NextResponse.json({ success: true, students: parsedStudents });
+    // Authoritative post-parse filtering on resolved fields (completely immune to base64 photo_data false positives)
+    const searchLower = searchQuery.trim().toLowerCase();
+    const searchDigits = searchQuery.trim().replace(/\D/g, '');
+    const filteredStudents = parsedStudents.filter((student: any) => {
+      if (program && !isProgramMatching(student.program, program)) {
+        return false;
+      }
+      if (subProgram && !isSubProgramMatching(student.sub_program, subProgram)) {
+        return false;
+      }
+      if (searchLower) {
+        const d = student.details_json || {};
+        const searchableText = [
+          student.full_name,
+          student.student_code,
+          student.phone,
+          student.email,
+          student.passport_number,
+          student.program,
+          student.sub_program,
+          d.name_native,
+          d.furigana,
+          d.address,
+          d.phone,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+
+        const phoneClean = String(student.phone || d.phone || '').replace(/\D/g, '');
+        const matchesText = searchableText.includes(searchLower);
+        const matchesPhone = searchDigits.length >= 3 && phoneClean.includes(searchDigits);
+        if (!matchesText && !matchesPhone) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    return NextResponse.json({ success: true, students: filteredStudents });
   } catch (error: any) {
     console.error('Error fetching students:', error);
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });

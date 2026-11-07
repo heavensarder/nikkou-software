@@ -29,7 +29,14 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { StudentCv } from '@/types/cv';
-import { PROGRAM_OPTIONS, getSubPrograms, formatProgramBadge, normalizeProgramId } from '@/lib/programs';
+import {
+  PROGRAM_OPTIONS,
+  getSubPrograms,
+  formatProgramBadge,
+  normalizeProgramId,
+  isProgramMatching,
+  isSubProgramMatching,
+} from '@/lib/programs';
 import { getSkillTestsForCategory, formatSkillTestStatus } from '@/lib/skill-tests';
 import styles from '../cv-maker.module.css';
 import { formatJapaneseBirthDate, formatLanguageDisplay, normalizeCandidateAge } from '@/lib/cv-normalizer';
@@ -144,6 +151,7 @@ export default function StudentListPage() {
   const [newStudentNotification, setNewStudentNotification] = useState<StudentCv | null>(null);
   const isFirstLoadRef = useRef(true);
   const isFetchingRef = useRef(false);
+  const fetchRequestIdRef = useRef(0);
   const knownStudentIdsRef = useRef<Set<number>>(new Set());
 
   // Load unread new applications from persistent storage on mount
@@ -475,8 +483,12 @@ export default function StudentListPage() {
     subVal = selectedSubProgram,
     isSilent = false
   ) => {
-    if (isFetchingRef.current) return;
+    // Only skip if a background silent poll arrives while another request is already in flight.
+    // Never drop an explicit filter/search request from the user.
+    if (isSilent && isFetchingRef.current) return;
     isFetchingRef.current = true;
+    const currentReqId = ++fetchRequestIdRef.current;
+
     try {
       if (!isSilent) {
         setLoading(true);
@@ -490,8 +502,15 @@ export default function StudentListPage() {
       if (subVal) params.set('sub_program', subVal);
 
       const res = await fetch(`/api/cv-maker/students?${params.toString()}`);
+      if (currentReqId !== fetchRequestIdRef.current) {
+        return;
+      }
+
       if (res.ok) {
         const data = await res.json();
+        if (currentReqId !== fetchRequestIdRef.current) {
+          return;
+        }
         if (data.success && Array.isArray(data.students)) {
           const freshStudents: StudentCv[] = data.students;
 
@@ -549,12 +568,17 @@ export default function StudentListPage() {
         }
       }
     } catch (err: any) {
+      if (currentReqId !== fetchRequestIdRef.current) {
+        return;
+      }
       console.error('Failed to load students:', err);
       setFetchError(err.message || 'Network error connecting to server');
     } finally {
-      setLoading(false);
-      setIsRefreshing(false);
-      isFetchingRef.current = false;
+      if (currentReqId === fetchRequestIdRef.current) {
+        setLoading(false);
+        setIsRefreshing(false);
+        isFetchingRef.current = false;
+      }
     }
   };
 
@@ -595,15 +619,51 @@ export default function StudentListPage() {
 
   const handleProgramChange = (prog: string) => {
     setSelectedProgram(prog);
-    if (prog) {
-      const validSubs = getSubPrograms(prog).flatMap((s) => [s.id, ...(s.subOptions?.map((o) => o.id) || [])]);
-      if (selectedSubProgram && !validSubs.includes(selectedSubProgram)) {
-        setSelectedSubProgram('');
-      }
+    setSelectedSubProgram('');
+  };
+
+  const handleSubProgramChange = (subVal: string) => {
+    if (subVal.includes(':::')) {
+      const [progId, subId] = subVal.split(':::');
+      setSelectedProgram(progId);
+      setSelectedSubProgram(subId);
     } else {
-      setSelectedSubProgram('');
+      setSelectedSubProgram(subVal);
     }
   };
+
+  const displayedStudents = students.filter((student) => {
+    const effectiveProg =
+      student.program ||
+      student.details_json?.program ||
+      student.details_json?.selectedProgram ||
+      null;
+    const effectiveSub =
+      student.sub_program ||
+      student.details_json?.sub_program ||
+      student.details_json?.subProgram ||
+      student.details_json?.category ||
+      null;
+
+    if (selectedProgram && !isProgramMatching(effectiveProg, selectedProgram)) {
+      return false;
+    }
+    if (selectedSubProgram && !isSubProgramMatching(effectiveSub, selectedSubProgram)) {
+      return false;
+    }
+    if (selectedStatus) {
+      if (selectedStatus === 'unread') {
+        const isUnread =
+          student.is_read === false ||
+          (student as any).is_read === 0 ||
+          newlyArrivedIds.has(student.id);
+        if (!isUnread) return false;
+      } else if (student.status !== selectedStatus) {
+        return false;
+      }
+    }
+    return true;
+  });
 
   const handleResetFilters = () => {
     setSearchQuery('');
@@ -960,7 +1020,7 @@ export default function StudentListPage() {
             {/* Filter by Sub-program / Category */}
             <select
               value={selectedSubProgram}
-              onChange={(e) => setSelectedSubProgram(e.target.value)}
+              onChange={(e) => handleSubProgramChange(e.target.value)}
               className={styles.filterSelect}
               style={{ fontWeight: 600, minWidth: '170px' }}
               title="Filter by Category / Sub-program"
@@ -994,18 +1054,18 @@ export default function StudentListPage() {
                     {prog.subPrograms.flatMap((sub) => {
                       if (sub.subOptions && sub.subOptions.length > 0) {
                         return [
-                          <option key={`${prog.id}-${sub.id}`} value={sub.id}>
-                            {sub.label} (All)
+                          <option key={`${prog.id}-${sub.id}`} value={`${prog.id}:::${sub.id}`}>
+                            {sub.label} (All / সব কৃষি)
                           </option>,
                           ...sub.subOptions.map((opt) => (
-                            <option key={`${prog.id}-${opt.id}`} value={opt.id}>
+                            <option key={`${prog.id}-${opt.id}`} value={`${prog.id}:::${opt.id}`}>
                               &nbsp;&nbsp;↳ {opt.label} ({opt.labelJp})
                             </option>
                           )),
                         ];
                       }
                       return (
-                        <option key={`${prog.id}-${sub.id}`} value={sub.id}>
+                        <option key={`${prog.id}-${sub.id}`} value={`${prog.id}:::${sub.id}`}>
                           {sub.label}
                         </option>
                       );
@@ -1113,7 +1173,7 @@ export default function StudentListPage() {
                     </div>
                   </td>
                 </tr>
-              ) : students.length === 0 ? (
+              ) : displayedStudents.length === 0 ? (
                 <tr>
                   <td colSpan={8}>
                     <div className={styles.emptyState}>
@@ -1151,7 +1211,7 @@ export default function StudentListPage() {
                   </td>
                 </tr>
               ) : (
-                students.map((student) => {
+                displayedStudents.map((student) => {
                   const isNewlyArrived =
                     student.is_read === false ||
                     (student as any).is_read === 0 ||
