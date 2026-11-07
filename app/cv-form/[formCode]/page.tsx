@@ -41,6 +41,68 @@ function PublicStudentCvFormContent() {
   // Category & Program Selection (Top of form)
   const [program, setProgram] = useState('');
   const [subProgram, setSubProgram] = useState('');
+  const [lockedConfig, setLockedConfig] = useState<{
+    enabled: boolean;
+    program: string;
+    subProgram: string;
+  }>({
+    enabled: false,
+    program: '',
+    subProgram: '',
+  });
+
+  const isLockedProgram = Boolean(lockedConfig.enabled && lockedConfig.program);
+  const isSSWAgriUmbrellaLock =
+    isLockedProgram &&
+    normalizeProgramId(lockedConfig.program) === 'SSW' &&
+    lockedConfig.subProgram.trim().toLowerCase() === 'agriculture';
+  const isLockedSubProgram = Boolean(
+    isLockedProgram && lockedConfig.subProgram && !isSSWAgriUmbrellaLock
+  );
+  const isLockedCategoryOnly = Boolean(isSSWAgriUmbrellaLock);
+
+  useEffect(() => {
+    async function loadFixedCategoryConfig() {
+      try {
+        if (typeof window !== 'undefined') {
+          const sp = new URLSearchParams(window.location.search);
+          const urlProg = (sp.get('program') || '').trim();
+          const urlSub = (sp.get('sub_program') || sp.get('category') || '').trim();
+          if (urlProg) {
+            const normP = normalizeProgramId(urlProg) || urlProg;
+            setLockedConfig({ enabled: true, program: normP, subProgram: urlSub });
+            setProgram(normP);
+            if (urlSub) {
+              setSubProgram(
+                normP === 'SSW' && urlSub.toLowerCase() === 'agriculture'
+                  ? 'Agriculture - General Crop Farming'
+                  : urlSub
+              );
+            }
+            return;
+          }
+        }
+        const res = await fetch('/api/settings/public-form');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.lockEnabled && data.fixedProgram) {
+            const normP = normalizeProgramId(data.fixedProgram) || data.fixedProgram;
+            const fixedS = (data.fixedSubProgram || '').trim();
+            setLockedConfig({ enabled: true, program: normP, subProgram: fixedS });
+            setProgram(normP);
+            if (fixedS) {
+              setSubProgram(
+                normP === 'SSW' && fixedS.toLowerCase() === 'agriculture'
+                  ? 'Agriculture - General Crop Farming'
+                  : fixedS
+              );
+            }
+          }
+        }
+      } catch {}
+    }
+    loadFixedCategoryConfig();
+  }, []);
 
   // Form Fields
   const [fullName, setFullName] = useState('');
@@ -232,8 +294,18 @@ function PublicStudentCvFormContent() {
             <ProgramCategorySection
               program={program}
               subProgram={subProgram}
-              onChangeProgram={setProgram}
-              onChangeSubProgram={setSubProgram}
+              onChangeProgram={(val) => {
+                if (isLockedProgram) return;
+                setProgram(val);
+              }}
+              onChangeSubProgram={(val) => {
+                if (isLockedSubProgram) return;
+                if (isLockedCategoryOnly && !val) return;
+                setSubProgram(val);
+              }}
+              lockedProgram={isLockedProgram}
+              lockedSubProgram={isLockedSubProgram}
+              lockedCategoryOnly={isLockedCategoryOnly}
             />
 
             {/* Section 1: Personal Particulars */}

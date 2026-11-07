@@ -6,14 +6,18 @@ import {
   getSubPrograms,
   normalizeProgramId,
   isSubProgramMatching,
+  formatProgramBadge,
 } from '@/lib/programs';
-import { Layers, CheckCircle2 } from 'lucide-react';
+import { Layers, CheckCircle2, Lock } from 'lucide-react';
 
 interface ProgramCategorySectionProps {
   program: string;
   subProgram: string;
   onChangeProgram: (program: string) => void;
   onChangeSubProgram: (subProgram: string) => void;
+  lockedProgram?: boolean;
+  lockedSubProgram?: boolean;
+  lockedCategoryOnly?: boolean;
 }
 
 export default function ProgramCategorySection({
@@ -21,11 +25,16 @@ export default function ProgramCategorySection({
   subProgram,
   onChangeProgram,
   onChangeSubProgram,
+  lockedProgram = false,
+  lockedSubProgram = false,
+  lockedCategoryOnly = false,
 }: ProgramCategorySectionProps) {
   const normalizedProg = normalizeProgramId(program);
   const currentSubPrograms = getSubPrograms(normalizedProg);
+  const isAnyLocked = Boolean(lockedProgram || lockedSubProgram || lockedCategoryOnly);
 
   const handleProgramSelect = (selectedProg: string) => {
+    if (lockedProgram) return;
     if (normalizedProg === selectedProg) {
       onChangeProgram('');
       onChangeSubProgram('');
@@ -107,24 +116,72 @@ export default function ProgramCategorySection({
           </h2>
         </div>
 
-        <span
-          style={{
-            fontSize: '11.5px',
-            fontWeight: 700,
-            color: '#64748b',
-            backgroundColor: '#f1f5f9',
-            border: '1px solid #cbd5e1',
-            padding: '3px 10px',
-            borderRadius: '9999px',
-          }}
-        >
-          任意 / ঐচ্ছিক
-        </span>
+        {isAnyLocked ? (
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              fontSize: '11.5px',
+              fontWeight: 800,
+              color: '#b91c1c',
+              backgroundColor: '#fef2f2',
+              border: '1.5px solid #fca5a5',
+              padding: '4px 12px',
+              borderRadius: '9999px',
+            }}
+          >
+            <Lock size={13} />
+            固定カテゴリー / ক্যাটাগরি নির্ধারিত (Fixed)
+          </span>
+        ) : (
+          <span
+            style={{
+              fontSize: '11.5px',
+              fontWeight: 700,
+              color: '#64748b',
+              backgroundColor: '#f1f5f9',
+              border: '1px solid #cbd5e1',
+              padding: '3px 10px',
+              borderRadius: '9999px',
+            }}
+          >
+            任意 / ঐচ্ছিক
+          </span>
+        )}
       </div>
 
-      <p style={{ fontSize: '13.5px', color: '#64748b', margin: '0 0 16px 0', lineHeight: 1.5 }}>
-        আবেদনের ধরণ এবং কাজের ক্ষেত্র/বিষয় নির্বাচন করুন (Select the program and field/course for this application):
-      </p>
+      {isAnyLocked ? (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '10px',
+            padding: '12px 16px',
+            marginBottom: '18px',
+            borderRadius: '10px',
+            backgroundColor: '#fff7ed',
+            border: '1.5px solid #fdba74',
+            color: '#9a3412',
+            fontSize: '13px',
+            lineHeight: 1.5,
+          }}
+        >
+          <Lock size={18} style={{ flexShrink: 0, marginTop: '2px', color: '#ea580c' }} />
+          <div>
+            <div style={{ fontWeight: 800, color: '#7c2d12', marginBottom: '2px' }}>
+              Application Category Fixed: {formatProgramBadge(program, subProgram)}
+            </div>
+            <div>
+              এই ফর্মটি উপরোক্ত নির্ধারিত প্রোগ্রাম ও ক্যাটাগরির আবেদনের জন্য নির্ধারিত (Category is locked by administration and cannot be changed).
+            </div>
+          </div>
+        </div>
+      ) : (
+        <p style={{ fontSize: '13.5px', color: '#64748b', margin: '0 0 16px 0', lineHeight: 1.5 }}>
+          আবেদনের ধরণ এবং কাজের ক্ষেত্র/বিষয় নির্বাচন করুন (Select the program and field/course for this application):
+        </p>
+      )}
 
       {/* Program Selection Cards / Pills */}
       <div style={{ marginBottom: '22px' }}>
@@ -150,10 +207,12 @@ export default function ProgramCategorySection({
         >
           {PROGRAM_OPTIONS.map((opt) => {
             const isSelected = normalizedProg === opt.id;
+            const isOptionDisabled = lockedProgram && !isSelected;
             return (
               <button
                 key={opt.id}
                 type="button"
+                disabled={lockedProgram}
                 onClick={() => handleProgramSelect(opt.id)}
                 style={{
                   textAlign: 'left',
@@ -162,8 +221,9 @@ export default function ProgramCategorySection({
                   border: isSelected
                     ? '2px solid var(--nikkou-red, #dc2626)'
                     : '1.5px solid #e2e8f0',
-                  background: isSelected ? '#fef2f2' : '#ffffff',
-                  cursor: 'pointer',
+                  background: isSelected ? '#fef2f2' : isOptionDisabled ? '#f8fafc' : '#ffffff',
+                  cursor: lockedProgram ? 'not-allowed' : 'pointer',
+                  opacity: isOptionDisabled ? 0.42 : 1,
                   transition: 'all 0.18s ease-in-out',
                   display: 'flex',
                   alignItems: 'flex-start',
@@ -208,7 +268,7 @@ export default function ProgramCategorySection({
           })}
         </div>
 
-        {normalizedProg && (
+        {normalizedProg && !lockedProgram && (
           <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'flex-end' }}>
             <button
               type="button"
@@ -266,8 +326,11 @@ export default function ProgramCategorySection({
             {currentSubPrograms.map((sub) => {
               const hasSubOptions = Array.isArray(sub.subOptions) && sub.subOptions.length > 0;
               const isSelected = isSubProgramMatching(subProgram, sub.id);
+              const isCategoryLocked = lockedSubProgram || lockedCategoryOnly;
+              const isOptionDisabled = isCategoryLocked && !isSelected;
 
               const handleCategoryClick = () => {
+                if (isCategoryLocked) return;
                 if (isSelected) {
                   onChangeSubProgram('');
                 } else if (hasSubOptions) {
@@ -282,6 +345,7 @@ export default function ProgramCategorySection({
                 <button
                   key={sub.id}
                   type="button"
+                  disabled={isCategoryLocked}
                   onClick={handleCategoryClick}
                   style={{
                     textAlign: 'left',
@@ -290,8 +354,9 @@ export default function ProgramCategorySection({
                     border: isSelected
                       ? '2px solid var(--nikkou-red, #dc2626)'
                       : '1.5px solid #cbd5e1',
-                    background: isSelected ? '#ffffff' : '#ffffff',
-                    cursor: 'pointer',
+                    background: isSelected ? '#ffffff' : isOptionDisabled ? '#f1f5f9' : '#ffffff',
+                    cursor: isCategoryLocked ? 'not-allowed' : 'pointer',
+                    opacity: isOptionDisabled ? 0.42 : 1,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
@@ -358,7 +423,9 @@ export default function ProgramCategorySection({
                     🌾 農業の作業分野を選択 / Select Agriculture Sector (SSW):
                   </span>
                   <span style={{ fontSize: '11.5px', color: '#9a3412', fontWeight: 600 }}>
-                    ※ 耕種農業または畜産農業を選択してください
+                    {lockedSubProgram
+                      ? '🔒 固定された作業分野 / নির্ধারিত কৃষি ক্ষেত্র (Fixed Sector)'
+                      : '※ 耕種農業または畜産農業を選択してください'}
                   </span>
                 </div>
 
@@ -371,19 +438,25 @@ export default function ProgramCategorySection({
                 >
                   {agriOption.subOptions.map((subOpt) => {
                     const isSubOptSelected = isSubProgramMatching(subProgram, subOpt.id);
+                    const isSubOptDisabled = lockedSubProgram && !isSubOptSelected;
 
                     return (
                       <button
                         key={subOpt.id}
                         type="button"
-                        onClick={() => onChangeSubProgram(subOpt.id)}
+                        disabled={lockedSubProgram}
+                        onClick={() => {
+                          if (lockedSubProgram) return;
+                          onChangeSubProgram(subOpt.id);
+                        }}
                         style={{
                           textAlign: 'left',
                           padding: '12px 14px',
                           borderRadius: '8px',
                           border: isSubOptSelected ? '2px solid #ea580c' : '1.5px solid #fed7aa',
-                          background: isSubOptSelected ? '#fff7ed' : '#ffffff',
-                          cursor: 'pointer',
+                          background: isSubOptSelected ? '#fff7ed' : isSubOptDisabled ? '#f8fafc' : '#ffffff',
+                          cursor: lockedSubProgram ? 'not-allowed' : 'pointer',
+                          opacity: isSubOptDisabled ? 0.42 : 1,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
@@ -429,7 +502,7 @@ export default function ProgramCategorySection({
             );
           })()}
 
-          {subProgram && (
+          {subProgram && !lockedSubProgram && !lockedCategoryOnly && (
             <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'flex-end' }}>
               <button
                 type="button"

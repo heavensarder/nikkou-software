@@ -61,6 +61,25 @@ export default function FixedStudentCvForm() {
   // Category & Program Selection (Top of form, before photo)
   const [program, setProgram] = useState('');
   const [subProgram, setSubProgram] = useState('');
+  const [lockedConfig, setLockedConfig] = useState<{
+    enabled: boolean;
+    program: string;
+    subProgram: string;
+  }>({
+    enabled: false,
+    program: '',
+    subProgram: '',
+  });
+
+  const isLockedProgram = Boolean(lockedConfig.enabled && lockedConfig.program);
+  const isSSWAgriUmbrellaLock =
+    isLockedProgram &&
+    normalizeProgramId(lockedConfig.program) === 'SSW' &&
+    lockedConfig.subProgram.trim().toLowerCase() === 'agriculture';
+  const isLockedSubProgram = Boolean(
+    isLockedProgram && lockedConfig.subProgram && !isSSWAgriUmbrellaLock
+  );
+  const isLockedCategoryOnly = Boolean(isSSWAgriUmbrellaLock);
 
   // Field 1: Photo
   const [photo, setPhoto] = useState<string | null>(null);
@@ -358,6 +377,66 @@ export default function FixedStudentCvForm() {
   }, []);
 
 
+  // Load fixed/locked category config from URL params or global Admin Settings (/api/settings/public-form)
+  useEffect(() => {
+    async function loadFixedCategoryConfig() {
+      try {
+        if (typeof window !== 'undefined') {
+          const sp = new URLSearchParams(window.location.search);
+          const urlProg = (sp.get('program') || '').trim();
+          const urlSub = (sp.get('sub_program') || sp.get('category') || '').trim();
+          if (urlProg) {
+            setLockedConfig({
+              enabled: true,
+              program: normalizeProgramId(urlProg) || urlProg,
+              subProgram: urlSub,
+            });
+            return;
+          }
+        }
+
+        const res = await fetch('/api/settings/public-form');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.lockEnabled && data.fixedProgram) {
+            setLockedConfig({
+              enabled: true,
+              program: normalizeProgramId(data.fixedProgram) || data.fixedProgram,
+              subProgram: (data.fixedSubProgram || '').trim(),
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load public form lock settings:', err);
+      }
+    }
+    loadFixedCategoryConfig();
+  }, []);
+
+  // Enforce locked program & category whenever lockedConfig is active
+  useEffect(() => {
+    if (!lockedConfig.enabled || !lockedConfig.program) return;
+    const targetProg = normalizeProgramId(lockedConfig.program) || lockedConfig.program;
+    setProgram(targetProg);
+
+    if (lockedConfig.subProgram) {
+      if (
+        targetProg === 'SSW' &&
+        lockedConfig.subProgram.trim().toLowerCase() === 'agriculture'
+      ) {
+        setSubProgram((prev) => {
+          const p = (prev || '').toLowerCase();
+          if (p.includes('crop') || p.includes('livestock') || p.includes('耕種') || p.includes('畜産')) {
+            return prev;
+          }
+          return 'Agriculture - General Crop Farming';
+        });
+      } else {
+        setSubProgram(lockedConfig.subProgram);
+      }
+    }
+  }, [lockedConfig]);
+
   // Accidental navigation & refresh protection
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -384,8 +463,18 @@ export default function FixedStudentCvForm() {
       } catch {
         // ignore
       }
-      setProgram('');
-      setSubProgram('');
+      if (lockedConfig.enabled && lockedConfig.program) {
+        setProgram(normalizeProgramId(lockedConfig.program) || lockedConfig.program);
+        setSubProgram(
+          lockedConfig.subProgram.trim().toLowerCase() === 'agriculture' &&
+            normalizeProgramId(lockedConfig.program) === 'SSW'
+            ? 'Agriculture - General Crop Farming'
+            : lockedConfig.subProgram || ''
+        );
+      } else {
+        setProgram('');
+        setSubProgram('');
+      }
       setPhoto(null);
       setFurigana('');
       setFullName('');
@@ -612,8 +701,10 @@ export default function FixedStudentCvForm() {
       // ignore
     }
 
-    setProgram('SSW');
-    setSubProgram('Nursing / Caregiver');
+    if (!isLockedProgram) {
+      setProgram('SSW');
+      setSubProgram('Nursing / Caregiver');
+    }
 
     setFurigana('MD TARIQUL ISLAM');
     setFullName('MD TARIQUL ISLAM');
@@ -1015,8 +1106,18 @@ export default function FixedStudentCvForm() {
             <ProgramCategorySection
               program={program}
               subProgram={subProgram}
-              onChangeProgram={setProgram}
-              onChangeSubProgram={setSubProgram}
+              onChangeProgram={(val) => {
+                if (isLockedProgram) return;
+                setProgram(val);
+              }}
+              onChangeSubProgram={(val) => {
+                if (isLockedSubProgram) return;
+                if (isLockedCategoryOnly && !val) return;
+                setSubProgram(val);
+              }}
+              lockedProgram={isLockedProgram}
+              lockedSubProgram={isLockedSubProgram}
+              lockedCategoryOnly={isLockedCategoryOnly}
             />
 
             {/* Field 1: Formal Photo Upload with 45mm x 35mm instruction & Drag & Drop */}
