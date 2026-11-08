@@ -1623,7 +1623,7 @@ function EditStudentCvContent() {
               <div style={{ gridColumn: '1 / -1' }}>
                 <TranslatableTextarea
                   labelJp="志望動機"
-                  labelBn="আবেদন করার অনুপ্রেরণা"
+                  labelBn="জাপানে কেন যেতে চান?"
                   value={motivation}
                   onChange={setMotivation}
                   originalBn={motivationOriginalBn}

@@ -1991,7 +1991,7 @@ function CreateNewCvContent() {
             {/* Motivation: Translatable Text Area */}
             <TranslatableTextarea
               labelJp="志望動機"
-              labelBn="আবেদন করার অনুপ্রেরণা"
+              labelBn="জাপানে কেন যেতে চান?"
               value={motivation}
               onChange={setMotivation}
               originalBn={motivationOriginalBn}

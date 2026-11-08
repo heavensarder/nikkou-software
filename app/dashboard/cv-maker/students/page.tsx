@@ -139,7 +139,7 @@ function persistNewIds(ids: Set<number>) {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(STORAGE_NEW_IDS_KEY, JSON.stringify(Array.from(ids)));
-  } catch {}
+  } catch { }
 }
 
 export default function StudentListPage() {
@@ -2223,12 +2223,12 @@ export default function StudentListPage() {
                                 >
                                   {printVersion === 'japanese'
                                     ? formatPureJapaneseAge(
-                                        activeStudent.details_json?.age_display,
-                                        activeStudent.details_json?.dob_japanese || activeStudent.date_of_birth
-                                      )
+                                      activeStudent.details_json?.age_display,
+                                      activeStudent.details_json?.dob_japanese || activeStudent.date_of_birth
+                                    )
                                     : (activeStudent.details_json?.age_display ||
-                                        normalizeCandidateAge('', activeStudent.details_json?.dob_japanese || activeStudent.date_of_birth) ||
-                                        '—')}
+                                      normalizeCandidateAge('', activeStudent.details_json?.dob_japanese || activeStudent.date_of_birth) ||
+                                      '—')}
                                 </td>
                               </tr>
 
@@ -2605,7 +2605,7 @@ export default function StudentListPage() {
                         <tr style={{ borderBottom: '1px solid #2b5585' }}>
                           <td style={{ background: '#e8f0fe', padding: '5px 6px', borderRight: '1px solid #2b5585', lineHeight: 1.2 }}>
                             <div style={{ fontWeight: 700, fontSize: '11px', color: '#1f3864' }}>志望動機</div>
-                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>অনুপ্রেরণা</div>}
+                            {printVersion === 'student' && <div style={{ fontSize: '9.5px', color: '#475569' }}>জাপানে কেন যেতে চান?</div>}
                           </td>
                           <td colSpan={5} style={{ padding: '5px 8px', color: '#000000', lineHeight: 1.4, fontSize: '11px', wordBreak: 'break-word' }}>
                             {formatCvFieldValue(
