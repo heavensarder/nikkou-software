@@ -27,6 +27,7 @@ import {
   Lock,
   RefreshCw,
   AlertCircle,
+  Loader2,
 } from 'lucide-react';
 import { StudentCv } from '@/types/cv';
 import {
@@ -416,6 +417,7 @@ export default function StudentListPage() {
   // Print Number (番号/no) prompt and preview state
   const [printNumber, setPrintNumber] = useState<string>(''); // Empty by default in preview as requested
   const [isAskingPrintNumber, setIsAskingPrintNumber] = useState<boolean>(false);
+  const [isPrinting, setIsPrinting] = useState<boolean>(false);
   const [tempPrintNumber, setTempPrintNumber] = useState<string>('1');
   const [printKeepEmpty, setPrintKeepEmpty] = useState<boolean>(false);
 
@@ -429,6 +431,7 @@ export default function StudentListPage() {
     const finalNumber = printKeepEmpty ? '' : (tempPrintNumber.trim() || '1');
     setPrintNumber(finalNumber);
     setIsAskingPrintNumber(false);
+    setIsPrinting(true);
 
     const fileName = getExportPdfFileName(
       activeStudent?.details_json?.name_native || activeStudent?.full_name,
@@ -454,6 +457,7 @@ export default function StudentListPage() {
           if (typeof document !== 'undefined') {
             document.title = prevTitle;
           }
+          setIsPrinting(false);
         }, 1500);
       }
     }, 120);
@@ -1552,7 +1556,7 @@ export default function StudentListPage() {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
                 {/* Student Edit Link in Drawer */}
                 {activeStudent.status === 'verified' ? (
                   <span
@@ -1567,6 +1571,8 @@ export default function StudentListPage() {
                       color: '#047857',
                       fontSize: '12.5px',
                       fontWeight: 700,
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0,
                     }}
                     title="This application is verified and locked from editing."
                   >
@@ -1589,7 +1595,10 @@ export default function StudentListPage() {
                       fontSize: '13px',
                       fontWeight: 700,
                       cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0,
                       transition: 'all 0.2s ease',
+                      boxShadow: '0 1px 3px rgba(2, 132, 199, 0.08)',
                     }}
                     title="Copy shareable edit link for the student"
                   >
@@ -1614,7 +1623,7 @@ export default function StudentListPage() {
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
-                    padding: '8px 16px',
+                    padding: '8px 15px',
                     borderRadius: '8px',
                     border: '1.5px solid #bfdbfe',
                     background: '#eff6ff',
@@ -1623,7 +1632,10 @@ export default function StudentListPage() {
                     fontWeight: 700,
                     textDecoration: 'none',
                     cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
                     transition: 'all 0.2s ease',
+                    boxShadow: '0 1px 3px rgba(29, 78, 216, 0.08)',
                   }}
                   title="Edit student CV information"
                 >
@@ -1634,23 +1646,42 @@ export default function StudentListPage() {
                 <button
                   type="button"
                   onClick={handleInitiatePrint}
+                  disabled={isPrinting}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '6px',
-                    padding: '8px 16px',
+                    gap: '7px',
+                    padding: '8px 18px',
                     borderRadius: '8px',
-                    border: '1.5px solid var(--border-strong)',
-                    background: '#ffffff',
-                    color: 'var(--nikkou-navy)',
+                    border: 'none',
+                    background: isPrinting
+                      ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+                      : 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)',
+                    color: '#ffffff',
                     fontSize: '13px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
+                    fontWeight: 800,
+                    cursor: isPrinting ? 'not-allowed' : 'pointer',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                    boxShadow: isPrinting
+                      ? '0 2px 8px rgba(37, 99, 235, 0.25)'
+                      : '0 3px 12px rgba(29, 78, 216, 0.32)',
                     transition: 'all 0.2s ease',
+                    letterSpacing: '0.2px',
                   }}
+                  title="Print student CV document or export to PDF"
                 >
-                  <Printer size={16} />
-                  <span>Print CV</span>
+                  {isPrinting ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Printing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Printer size={16} />
+                      <span>Print CV</span>
+                    </>
+                  )}
                 </button>
 
                 <button
@@ -1669,6 +1700,7 @@ export default function StudentListPage() {
                     border: 'none',
                     cursor: 'pointer',
                     color: '#334155',
+                    flexShrink: 0,
                   }}
                 >
                   <X size={20} />
@@ -3677,6 +3709,7 @@ export default function StudentListPage() {
               <button
                 type="button"
                 onClick={() => handleConfirmPrint()}
+                disabled={isPrinting}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -3684,16 +3717,28 @@ export default function StudentListPage() {
                   padding: '9px 20px',
                   borderRadius: '8px',
                   border: 'none',
-                  background: 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)',
+                  background: isPrinting
+                    ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+                    : 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)',
                   color: '#ffffff',
                   fontSize: '13px',
                   fontWeight: 700,
-                  cursor: 'pointer',
+                  cursor: isPrinting ? 'not-allowed' : 'pointer',
                   boxShadow: '0 4px 12px rgba(29, 78, 216, 0.28)',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                <Printer size={16} />
-                <span>Confirm & Print</span>
+                {isPrinting ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Preparing Document...</span>
+                  </>
+                ) : (
+                  <>
+                    <Printer size={16} />
+                    <span>Confirm & Print</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
