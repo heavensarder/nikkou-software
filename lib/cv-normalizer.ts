@@ -208,10 +208,13 @@ export function normalizeFamilySupport(val: any): string {
 }
 
 export function normalizeJapanVisaType(val: any): string {
-  if (!val) return '無 / না';
+  if (!val) return 'N/A';
   const s = String(val).toLowerCase().trim();
+  if (s === 'n/a' || s.includes('n/a')) {
+    return 'N/A';
+  }
   if (s.includes('無') || s.includes('none') || s.includes('না') || s.includes('no') || s.includes('never') || s.includes('nil')) {
-    return '無 / না';
+    return 'N/A';
   }
   if (s.includes('留学') || s.includes('student') || s.includes('স্টুডেন্ট')) return '留学 / স্টুডেন্ট ভিসা';
   if (s.includes('技能実習') || s.includes('trainee') || s.includes('intern') || s.includes('টেকনিক্যাল')) return '技能実習 / টেকনিক্যাল ইন্টার্ন';
@@ -219,7 +222,7 @@ export function normalizeJapanVisaType(val: any): string {
   if (s.includes('家族') || s.includes('dependent') || s.includes('ডিপেন্ডেন্ট')) return '家族滞在 / ডিপেন্ডেন্ট';
   if (s.includes('短期') || s.includes('tourist') || s.includes('ট্যুরিস্ট') || s.includes('visitor')) return '短期滞在 / ট্যুরিস্ট';
   if (s.includes('その他') || s.includes('other') || s.includes('অন্যান্য')) return 'その他 / অন্যান্য';
-  return 'その他 / অন্যান্য';
+  return String(val).trim();
 }
 
 export function normalizeEducationSubject(val: any): string {

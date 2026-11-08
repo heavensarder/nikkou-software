@@ -241,8 +241,13 @@ function EditStudentCvContent() {
         setMotivationOriginalBn(d.motivation_original_bn || d.motivationOriginalBn || '');
         setFuturePlanAfterJapan(d.future_plan_after_japan || '');
         setFuturePlanOriginalBn(d.future_plan_original_bn || d.futurePlanOriginalBn || '');
-        setJapanVisaAppliedBefore(d.japan_visa_applied_before ? normalizeYesNo(d.japan_visa_applied_before, true) : '無 / না');
-        setJapanVisaTypeApplied(d.japan_visa_type_applied ? normalizeJapanVisaType(d.japan_visa_type_applied) : '無 / না');
+        const visaApplied = d.japan_visa_applied_before ? normalizeYesNo(d.japan_visa_applied_before, true) : '無 / না';
+        setJapanVisaAppliedBefore(visaApplied);
+        if (visaApplied && visaApplied.includes('有')) {
+          setJapanVisaTypeApplied(d.japan_visa_type_applied ? normalizeJapanVisaType(d.japan_visa_type_applied) : '');
+        } else {
+          setJapanVisaTypeApplied('N/A');
+        }
 
         if (Array.isArray(d.education_history) && d.education_history.length > 0) {
           setEducationHistory(d.education_history);
@@ -340,8 +345,8 @@ function EditStudentCvContent() {
             target_savings_5years: targetSavings5Years.trim(),
             motivation: motivation.trim(),
             future_plan_after_japan: futurePlanAfterJapan.trim(),
-            japan_visa_applied_before: japanVisaAppliedBefore,
-            japan_visa_type_applied: japanVisaTypeApplied.trim(),
+            japan_visa_applied_before: japanVisaAppliedBefore || '無 / না',
+            japan_visa_type_applied: (japanVisaAppliedBefore && japanVisaAppliedBefore.includes('有')) ? japanVisaTypeApplied.trim() : 'N/A',
             skill_tests: skillTests,
             education_history: educationHistory.filter(
               (item) => item.school_name.trim() || item.start_year_month || item.end_year_month || item.major_subject || item.qualification
@@ -456,8 +461,8 @@ function EditStudentCvContent() {
             motivation_original_bn: motivationOriginalBn.trim(),
             future_plan_after_japan: futurePlanAfterJapan.trim(),
             future_plan_original_bn: futurePlanOriginalBn.trim(),
-            japan_visa_applied_before: japanVisaAppliedBefore,
-            japan_visa_type_applied: japanVisaTypeApplied.trim(),
+            japan_visa_applied_before: japanVisaAppliedBefore || '無 / না',
+            japan_visa_type_applied: (japanVisaAppliedBefore && japanVisaAppliedBefore.includes('有')) ? japanVisaTypeApplied.trim() : 'N/A',
             // Section 3: 学歴 / শিক্ষাগত যোগ্যতা
             skill_tests: skillTests,
             education_history: educationHistory.filter(
@@ -1565,11 +1570,21 @@ function EditStudentCvContent() {
                 </label>
                 <select
                   value={japanVisaAppliedBefore}
-                  onChange={(e) => setJapanVisaAppliedBefore(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setJapanVisaAppliedBefore(val);
+                    if (val.includes('有')) {
+                      if (japanVisaTypeApplied === 'N/A' || japanVisaTypeApplied === '無 / না') {
+                        setJapanVisaTypeApplied('');
+                      }
+                    } else {
+                      setJapanVisaTypeApplied('N/A');
+                    }
+                  }}
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid var(--border-light)', fontSize: '14px', fontWeight: 600, background: '#ffffff' }}
                 >
-                  <option value="無 / না">無 / না (Never)</option>
-                  <option value="有 / হ্যাঁ">有 / হ্যাঁ (Applied)</option>
+                  <option value="無 / না">無 / না</option>
+                  <option value="有 / হ্যাঁ">有 / হ্যাঁ</option>
                 </select>
               </div>
 
@@ -1578,13 +1593,70 @@ function EditStudentCvContent() {
                 <label style={{ display: 'block', fontSize: '13.5px', fontWeight: 700, color: 'var(--nikkou-navy)', marginBottom: '8px' }}>
                   申請したことがある場合、どの資格に申請したか / যদি তাই হয়, আপনি কি ভিসার জন্য আবেদন করেছেন?
                 </label>
-                <input
-                  type="text"
-                  value={japanVisaTypeApplied}
-                  onChange={(e) => setJapanVisaTypeApplied(e.target.value)}
-                  placeholder="無 / না"
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid var(--border-light)', fontSize: '14px', fontWeight: 600 }}
-                />
+                {japanVisaAppliedBefore && japanVisaAppliedBefore.includes('有') ? (
+                  <>
+                    <select
+                      value={
+                        ['', '留学 / স্টুডেন্ট ভিসা', '技能実習 / টেকনিক্যাল ইন্টার্ন', '特定技能 / স্পেসিফাইড স্কিল্ড', '家族滞在 / ডিপেন্ডেন্ট', '短期滞在 / ট্যুরিস্ট', 'その他 / অন্যান্য'].includes(japanVisaTypeApplied)
+                          ? japanVisaTypeApplied
+                          : (japanVisaTypeApplied && japanVisaTypeApplied !== 'N/A' && japanVisaTypeApplied !== '無 / না' ? 'その他 / অন্যান্য' : '')
+                      }
+                      onChange={(e) => setJapanVisaTypeApplied(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        borderRadius: '8px',
+                        border: '1.5px solid var(--border-light)',
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        background: '#ffffff',
+                        outline: 'none',
+                      }}
+                    >
+                      <option value="">選択してください / নির্বাচন করুন</option>
+                      <option value="留学 / স্টুডেন্ট ভিসা">留学 / স্টুডেন্ট ভিসা</option>
+                      <option value="技能実習 / টেকনিক্যাল ইন্টার্ন">技能実習 / টেকনিক্যাল ইন্টার্ন</option>
+                      <option value="特定技能 / স্পেসিফাইড স্কিল্ড">特定技能 / স্পেসিফাইড স্কিল্ড</option>
+                      <option value="家族滞在 / ডিপেন্ডেন্ট">家族滞在 / ডিপেন্ডেন্ট</option>
+                      <option value="短期滞在 / ট্যুরিস্ট">短期滞在 / ট্যুরিস্ট</option>
+                      <option value="その他 / অন্যান্য">その他 / অন্যান্য</option>
+                    </select>
+                    {(japanVisaTypeApplied === 'その他 / অন্যান্য' || (!['', 'N/A', '無 / না', '留学 / স্টুডেন্ট ভিসা', '技能実習 / টেকনিক্যাল ইন্টার্ন', '特定技能 / স্পেসিফাইড স্কিল্ড', '家族滞在 / ডিপেন্ডেন্ট', '短期滞在 / ট্যুরিস্ট'].includes(japanVisaTypeApplied) && japanVisaTypeApplied)) && (
+                      <input
+                        type="text"
+                        value={japanVisaTypeApplied === 'その他 / অন্যান্য' ? '' : japanVisaTypeApplied}
+                        onChange={(e) => setJapanVisaTypeApplied(e.target.value || 'その他 / অন্যান্য')}
+                        placeholder="具体的なビザの種類を入力 / ভিসার ধরন বিস্তারিত লিখুন"
+                        style={{
+                          width: '100%',
+                          padding: '10px 14px',
+                          borderRadius: '8px',
+                          border: '1.5px solid var(--border-light)',
+                          marginTop: '8px',
+                          fontSize: '13.5px',
+                          outline: 'none',
+                        }}
+                      />
+                    )}
+                  </>
+                ) : (
+                  <input
+                    type="text"
+                    disabled
+                    value="N/A"
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      borderRadius: '8px',
+                      border: '1.5px solid var(--border-light)',
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      background: '#f8fafc',
+                      color: '#64748b',
+                      cursor: 'not-allowed',
+                    }}
+                  />
+                )}
               </div>
 
               {/* Hobbies (Span full width) */}

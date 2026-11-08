@@ -2683,9 +2683,26 @@ export default function StudentListPage() {
                             )}
                           </td>
                           <td colSpan={2} style={{ padding: '5px 8px', fontWeight: 600, color: '#000000', fontSize: '11.5px', textAlign: 'center' }}>
-                            {printVersion === 'japanese'
-                              ? stripBengali(activeStudent.details_json?.japan_visa_type_applied) || '—'
-                              : (activeStudent.details_json?.japan_visa_type_applied || '—')}
+                            {(() => {
+                              const appliedBefore = String(activeStudent.details_json?.japan_visa_applied_before || '');
+                              const isYes = appliedBefore.includes('有') || appliedBefore.toLowerCase().includes('yes');
+                              const visaType = String(activeStudent.details_json?.japan_visa_type_applied || '').trim();
+
+                              if (
+                                !isYes ||
+                                !visaType ||
+                                visaType === '無 / না' ||
+                                visaType === '無' ||
+                                visaType.toUpperCase() === 'N/A' ||
+                                visaType === '—'
+                              ) {
+                                return 'N/A';
+                              }
+
+                              return printVersion === 'japanese'
+                                ? stripBengali(visaType) || 'N/A'
+                                : visaType;
+                            })()}
                           </td>
                         </tr>
                       </tbody>

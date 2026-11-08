@@ -317,8 +317,8 @@ function StudentCvEditFormContent() {
           motivation_original_bn: motivationOriginalBn.trim(),
           future_plan_after_japan: futurePlanAfterJapan.trim(),
           future_plan_original_bn: futurePlanOriginalBn.trim(),
-          japan_visa_applied_before: japanVisaAppliedBefore,
-          japan_visa_type_applied: japanVisaTypeApplied,
+          japan_visa_applied_before: japanVisaAppliedBefore || '無 / না',
+          japan_visa_type_applied: (japanVisaAppliedBefore && japanVisaAppliedBefore.includes('有')) ? japanVisaTypeApplied.trim() : 'N/A',
           skill_tests: skillTests,
           education_history: educationHistory.filter(
             (item) => item.school_name.trim() || item.start_year_month || item.end_year_month || item.major_subject || item.qualification
@@ -1188,7 +1188,17 @@ function StudentCvEditFormContent() {
                     </label>
                     <select
                       value={japanVisaAppliedBefore}
-                      onChange={(e) => setJapanVisaAppliedBefore(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setJapanVisaAppliedBefore(val);
+                        if (val.includes('有')) {
+                          if (japanVisaTypeApplied === 'N/A' || japanVisaTypeApplied === '無 / না') {
+                            setJapanVisaTypeApplied('');
+                          }
+                        } else {
+                          setJapanVisaTypeApplied('N/A');
+                        }
+                      }}
                       className={styles.formSelect}
                       style={{ color: japanVisaAppliedBefore ? 'var(--text-primary)' : '#94a3b8' }}
                     >
@@ -1205,24 +1215,37 @@ function StudentCvEditFormContent() {
                     <label className={styles.formLabel}>
                       申請したことがある場合、どの資格に申請したか / যদি তাই হয়, আপনি কি ভিসার জন্য আবেদন করেছেন?
                     </label>
-                    <select
-                      value={japanVisaTypeApplied}
-                      onChange={(e) => setJapanVisaTypeApplied(e.target.value)}
-                      className={styles.formSelect}
-                      style={{ color: japanVisaTypeApplied ? 'var(--text-primary)' : '#94a3b8' }}
-                    >
-                      <option value="">選択してください / নির্বাচন করুন</option>
-                      <option value="無 / না">無 / না</option>
-                      <option value="留学 / স্টুডেন্ট ভিসা">留学 / স্টুডেন্ট ভিসা</option>
-                      <option value="技能実習 / টেকনিক্যাল ইন্টার্ন">技能実習 / টেকনিক্যাল ইন্টার্ন</option>
-                      <option value="特定技能 / স্পেসিফাইড স্কিল্ড">特定技能 / স্পেসিফাইড স্কিল্ড</option>
-                      <option value="家族滞在 / ডিপেন্ডেন্ট">家族滞在 / ডিপেন্ডেন্ট</option>
-                      <option value="短期滞在 / ট্যুরিস্ট">短期滞在 / ট্যুরিস্ট</option>
-                      <option value="その他 / অন্যান্য">その他 / অন্যান্য</option>
-                      {japanVisaTypeApplied && !['無 / না', '留学 / স্টুডেন্ট ভিসা', '技能実習 / টেকনিক্যাল ইন্টার্ন', '特定技能 / স্পেসিফাইড স্কিল্ড', '家族滞在 / ডিপেন্ডেন্ট', '短期滞在 / ট্যুরিস্ট', 'その他 / অন্যান্য'].includes(japanVisaTypeApplied) && (
-                        <option value={japanVisaTypeApplied}>{japanVisaTypeApplied}</option>
-                      )}
-                    </select>
+                    {japanVisaAppliedBefore && japanVisaAppliedBefore.includes('有') ? (
+                      <select
+                        value={
+                          ['', '留学 / স্টুডেন্ট ভিসা', '技能実習 / টেকনিক্যাল ইন্টার্ন', '特定技能 / স্পেসিফাইড স্কিল্ড', '家族滞在 / ডিপেন্ডেন্ট', '短期滞在 / ট্যুরিস্ট', 'その他 / অন্যান্য'].includes(japanVisaTypeApplied)
+                            ? japanVisaTypeApplied
+                            : (japanVisaTypeApplied && japanVisaTypeApplied !== 'N/A' ? 'その他 / অন্যান্য' : '')
+                        }
+                        onChange={(e) => setJapanVisaTypeApplied(e.target.value)}
+                        className={styles.formSelect}
+                        style={{ color: japanVisaTypeApplied ? 'var(--text-primary)' : '#94a3b8' }}
+                      >
+                        <option value="">選択してください / নির্বাচন করুন</option>
+                        <option value="留学 / স্টুডেন্ট ভিসা">留学 / স্টুডেন্ট ভিসা</option>
+                        <option value="技能実習 / টেকনিক্যাল ইন্টার্ন">技能実習 / টেকনিক্যাল ইন্টার্ন</option>
+                        <option value="特定技能 / স্পেসিফাইড স্কিল্ড">特定技能 / স্পেসিফাইড স্কিল্ড</option>
+                        <option value="家族滞在 / ডিপেন্ডেন্ট">家族滞在 / ডিপেন্ডেন্ট</option>
+                        <option value="短期滞在 / ট্যুরিস্ট">短期滞在 / ট্যুরিস্ট</option>
+                        <option value="その他 / অন্যান্য">その他 / অন্যান্য</option>
+                        {japanVisaTypeApplied && !['', 'N/A', '無 / না', '留学 / স্টুডেন্ট ভিসা', '技能実習 / টেকনিক্যাল ইন্টার্ন', '特定技能 / স্পেসিফাইড স্কিল্ড', '家族滞在 / ডিপেন্ডেন্ট', '短期滞在 / ট্যুরিস্ট', 'その他 / অন্যান্য'].includes(japanVisaTypeApplied) && (
+                          <option value={japanVisaTypeApplied}>{japanVisaTypeApplied}</option>
+                        )}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        disabled
+                        value="N/A"
+                        className={styles.formInput}
+                        style={{ background: '#f8fafc', color: '#64748b', cursor: 'not-allowed', fontWeight: 700 }}
+                      />
+                    )}
                   </div>
                 </div>
               </div>
