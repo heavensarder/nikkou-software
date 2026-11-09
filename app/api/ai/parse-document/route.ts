@@ -145,6 +145,8 @@ IMPORTANT EXTRACTION PRINCIPLES:
      "JLPT N4 / জাপানি N4"
      "JLPT N3 / জাপানি N3"
      "JFT-Basic / জেএফটি-বেসিক"
+     "JFT A1 / জেএফটি A1"
+     "JFT A2 / জেএফটি A2"
      "専門学校/Diploma"
      (Or specific major/field name if technical/vocational)
    - education_history.qualification:
@@ -154,6 +156,9 @@ IMPORTANT EXTRACTION PRINCIPLES:
      "大学卒業 / স্নাতক (Honours / Bachelor)" (Degree / Honours / B.Sc / B.A / B.Com / BBA)
      "大学院修了 / স্নাতকোত্তর (Master's)" (Master's / M.Sc / M.A / MBA)
      "日本語 / জাপানি ভাষা (JLPT / NAT)" (Japanese Language Course)
+     "JFT-Basic / জেএফটি-বেসিক"
+     "JFT A1 / জেএফটি A1"
+     "JFT A2 / জেএফটি A2"
      "その他 / অন্যান্য" (Other)
    - family_members.relationship:
      "父 / পিতা" (Father)

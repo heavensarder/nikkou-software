@@ -251,6 +251,8 @@ export function normalizeEducationSubject(val: any): string {
   if (s.includes('n5') || s.includes('jlpt n5')) return 'JLPT N5 / জাপানি N5';
   if (s.includes('n4') || s.includes('jlpt n4')) return 'JLPT N4 / জাপানি N4';
   if (s.includes('n3') || s.includes('jlpt n3')) return 'JLPT N3 / জাপানি N3';
+  if (s.includes('jft a1') || s.includes('jft-a1') || s.includes('জেএফটি a1') || s.includes('জেএফটি এ১') || s.includes('জেএফটি a-1')) return 'JFT A1 / জেএফটি A1';
+  if (s.includes('jft a2') || s.includes('jft-a2') || s.includes('জেএফটি a2') || s.includes('জেএফটি এ২') || s.includes('জেএফটি a-2')) return 'JFT A2 / জেএফটি A2';
   if (s.includes('jft') || s.includes('basic') || s.includes('জেএফটি')) return 'JFT-Basic / জেএফটি-বেসিক';
   return String(val).trim();
 }
@@ -317,10 +319,18 @@ export function normalizeQualification(val: any): string {
   ) {
     return "大学院修了 / স্নাতকোত্তর (Master's)";
   }
+  if (s.includes('jft a1') || s.includes('jft-a1') || s.includes('জেএফটি a1') || s.includes('জেএফটি এ১') || s.includes('জেএফটি a-1')) {
+    return 'JFT A1 / জেএফটি A1';
+  }
+  if (s.includes('jft a2') || s.includes('jft-a2') || s.includes('জেএফটি a2') || s.includes('জেএফটি এ২') || s.includes('জেএফটি a-2')) {
+    return 'JFT A2 / জেএফটি A2';
+  }
+  if (s.includes('jft-basic') || s.includes('jft basic') || s.includes('jft') || s.includes('জেএফটি')) {
+    return 'JFT-Basic / জেএফটি-বেসিক';
+  }
   if (
     s.includes('jlpt') ||
     s.includes('nat') ||
-    s.includes('jft') ||
     s.includes('japanese') ||
     s.includes('জাপানি') ||
     s.includes('日本語')

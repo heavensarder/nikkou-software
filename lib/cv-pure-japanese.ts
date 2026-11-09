@@ -17,6 +17,18 @@ export function stripBengali(val: string | null | undefined): string {
     return '専門学校';
   }
 
+  // JFT certifications (Official English abbreviation in Japanese CV)
+  const lowerJft = trimmed.toLowerCase();
+  if (lowerJft.includes('jft a1') || lowerJft.includes('jft-a1') || trimmed.includes('জেএফটি A1') || trimmed.includes('জেএফটি a1') || trimmed.includes('জেএফটি এ১')) {
+    return 'JFT A1';
+  }
+  if (lowerJft.includes('jft a2') || lowerJft.includes('jft-a2') || trimmed.includes('জেএফটি A2') || trimmed.includes('জেএফটি a2') || trimmed.includes('জেএফটি এ২')) {
+    return 'JFT A2';
+  }
+  if (lowerJft.includes('jft-basic') || lowerJft.includes('jft basic') || lowerJft.includes('jft') || trimmed.includes('জেএফটি')) {
+    return 'JFT-Basic';
+  }
+
   // 1. If split by " / "
   if (trimmed.includes(' / ')) {
     const parts = trimmed.split(' / ');
@@ -180,6 +192,18 @@ export function formatEducationField(
     trimmed === '専門学校'
   ) {
     return version === 'japanese' ? '専門学校' : '専門学校/Diploma';
+  }
+
+  // JFT certifications (Always English part in Japanese version: JFT-Basic, JFT A1, JFT A2)
+  const lower = trimmed.toLowerCase();
+  if (lower.includes('jft a1') || lower.includes('jft-a1') || trimmed.includes('জেএফটি A1') || trimmed.includes('জেএফটি a1') || trimmed.includes('জেএফটি এ১')) {
+    return version === 'japanese' ? 'JFT A1' : 'JFT A1 / জেএফটি A1';
+  }
+  if (lower.includes('jft a2') || lower.includes('jft-a2') || trimmed.includes('জেএফটি A2') || trimmed.includes('জেএফটি a2') || trimmed.includes('জেএফটি এ২')) {
+    return version === 'japanese' ? 'JFT A2' : 'JFT A2 / জেএফটি A2';
+  }
+  if (lower.includes('jft-basic') || lower.includes('jft basic') || lower.includes('jft') || trimmed.includes('জেএফটি')) {
+    return version === 'japanese' ? 'JFT-Basic' : 'JFT-Basic / জেএফটি-বেসিক';
   }
 
   if (version === 'japanese') {
