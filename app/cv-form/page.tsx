@@ -809,6 +809,16 @@ export default function FixedStudentCvForm() {
     e.preventDefault();
     setErrorMsg('');
 
+    if (!phone || !phone.trim() || phone.trim() === '—') {
+      setErrorMsg('মোবাইল নম্বর বাধ্যতামূলক / 電話番号の入力は必須です (Mobile/Phone number is mandatory)');
+      const el = document.getElementById('applicant-phone-input');
+      if (el) {
+        el.focus();
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -1278,16 +1288,24 @@ export default function FixedStudentCvForm() {
 
               {/* Grid 5: Phone Number */}
               <div className={styles.formFieldFull}>
-                <label className={styles.formLabel}>
-                  電話 / ফোন
+                <label className={styles.formLabel} htmlFor="applicant-phone-input">
+                  電話 / ফোন <span style={{ color: '#dc2626', fontWeight: 700, fontSize: '13px' }}>* (必須 / বাধ্যতামূলক)</span>
                 </label>
                 <input
+                  id="applicant-phone-input"
                   type="tel"
+                  required
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="+8801612-017273"
                   className={styles.formInput}
+                  style={!phone.trim() && errorMsg ? { borderColor: '#dc2626', borderWidth: '2px' } : undefined}
                 />
+                {!phone.trim() && (
+                  <p style={{ fontSize: '12px', color: '#dc2626', marginTop: '4px', fontWeight: 600 }}>
+                    * মোবাইল নম্বর প্রদান করা আবশ্যক / 電話番号の入力は必須です
+                  </p>
+                )}
               </div>
             </div>
 

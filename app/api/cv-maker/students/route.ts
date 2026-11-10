@@ -321,6 +321,15 @@ export async function POST(request: NextRequest) {
     } = body;
 
     const isDraft = status === 'draft';
+    if (!isDraft && (!phone || !phone.trim() || phone.trim() === '—')) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'মোবাইল নম্বর বাধ্যতামূলক / 電話番号の入力は必須です (Mobile/Phone number is mandatory)',
+        },
+        { status: 400 }
+      );
+    }
     const finalFullName = (full_name && full_name.trim()) || (isDraft ? 'Untitled Draft' : 'Untitled Student');
     const finalPhone = (phone && phone.trim()) || '—';
     const finalProgram = body.program || body.selectedProgram || details?.program || details?.selectedProgram || null;

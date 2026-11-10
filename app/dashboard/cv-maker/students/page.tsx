@@ -2265,7 +2265,7 @@ export default function StudentListPage() {
                               </tr>
 
                               {/* Row 4: Contact Address */}
-                              <tr style={{ borderBottom: '1px solid #2b5585' }}>
+                              <tr style={{ borderBottom: printVersion === 'student' ? '1px solid #2b5585' : 'none' }}>
                                 <td
                                   style={{
                                     background: '#e8f0fe',
@@ -2299,36 +2299,36 @@ export default function StudentListPage() {
                                 </td>
                               </tr>
 
-                              {/* Row 5: Phone Number */}
-                              <tr>
-                                <td
-                                  style={{
-                                    background: '#e8f0fe',
-                                    padding: '4px 6px',
-                                    fontWeight: 700,
-                                    color: '#1f3864',
-                                    borderRight: '1px solid #2b5585',
-                                    fontSize: '11px',
-                                    lineHeight: 1.2,
-                                  }}
-                                >
-                                  <div>電話</div>
-                                  {printVersion === 'student' && (
+                              {/* Row 5: Phone Number (Student version only; Hidden in Japanese print version) */}
+                              {printVersion === 'student' && (
+                                <tr>
+                                  <td
+                                    style={{
+                                      background: '#e8f0fe',
+                                      padding: '4px 6px',
+                                      fontWeight: 700,
+                                      color: '#1f3864',
+                                      borderRight: '1px solid #2b5585',
+                                      fontSize: '11px',
+                                      lineHeight: 1.2,
+                                    }}
+                                  >
+                                    <div>電話</div>
                                     <div style={{ fontSize: '9px', color: '#475569' }}>ফোন</div>
-                                  )}
-                                </td>
-                                <td
-                                  colSpan={3}
-                                  style={{
-                                    padding: '4px 8px',
-                                    color: '#000000',
-                                    fontWeight: 700,
-                                    fontSize: '12px',
-                                  }}
-                                >
-                                  {activeStudent.details_json?.phone || activeStudent.phone || '—'}
-                                </td>
-                              </tr>
+                                  </td>
+                                  <td
+                                    colSpan={3}
+                                    style={{
+                                      padding: '4px 8px',
+                                      color: '#000000',
+                                      fontWeight: 700,
+                                      fontSize: '12px',
+                                    }}
+                                  >
+                                    {activeStudent.details_json?.phone || activeStudent.phone || '—'}
+                                  </td>
+                                </tr>
+                              )}
                             </tbody>
                           </table>
                         </div>

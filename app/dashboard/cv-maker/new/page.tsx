@@ -800,6 +800,16 @@ function CreateNewCvContent() {
     setErrorMsg('');
     setSuccessMsg('');
 
+    if (!phone || !phone.trim() || phone.trim() === '—') {
+      setErrorMsg('মোবাইল নম্বর বাধ্যতামূলক / 電話番号の入力は必須です (Mobile/Phone number is mandatory)');
+      const el = document.getElementById('admin-new-phone-input');
+      if (el) {
+        el.focus();
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -1549,11 +1559,13 @@ function CreateNewCvContent() {
 
             {/* Grid 5: Phone Number */}
             <div style={{ marginBottom: '18px' }}>
-              <label style={{ display: 'block', fontSize: '13.5px', fontWeight: 700, color: 'var(--nikkou-navy)', marginBottom: '6px' }}>
-                電話 / ফোন
+              <label htmlFor="admin-new-phone-input" style={{ display: 'block', fontSize: '13.5px', fontWeight: 700, color: 'var(--nikkou-navy)', marginBottom: '6px' }}>
+                電話 / ফোন <span style={{ color: '#dc2626', fontWeight: 700, fontSize: '13px' }}>* (必須 / বাধ্যতামূলক)</span>
               </label>
               <input
+                id="admin-new-phone-input"
                 type="tel"
+                required
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="+8801612-017273"
@@ -1562,12 +1574,17 @@ function CreateNewCvContent() {
                   height: '44px',
                   padding: '0 14px',
                   borderRadius: '8px',
-                  border: '1.5px solid var(--border-light)',
+                  border: !phone.trim() && errorMsg ? '2px solid #dc2626' : '1.5px solid var(--border-light)',
                   fontSize: '14px',
                   color: 'var(--text-primary)',
                   outline: 'none',
                 }}
               />
+              {!phone.trim() && (
+                <p style={{ fontSize: '12px', color: '#dc2626', marginTop: '4px', fontWeight: 600 }}>
+                  * মোবাইল নম্বর প্রদান করা আবশ্যক / 電話番号の入力は必須です
+                </p>
+              )}
             </div>
           </div>
 
